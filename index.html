@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CoreDelivery</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+  :root{
+    --bg:#EEF6F4; --card:#ffffff; --ink:#10312F; --muted:#5D7B77;
+    --brand:#12897B; --brand-dark:#0E6B60; --ok:#0e9f6e; --warn:#d97706;
+    --line:#D6E7E3; --danger:#dc2626;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif;}
+  body{background:#D8E7E3; display:flex; justify-content:center; min-height:100vh; padding:16px 0;}
+  .phone{width:100%; max-width:420px; background:var(--bg); border-radius:24px; overflow:hidden;
+    box-shadow:0 12px 40px rgba(20,30,60,.25); display:flex; flex-direction:column; height:94vh;
+    position:relative;}
+  /* main өөрөө padding-гүй — хэсэг бүр өөрийн padding-тай.
+     Ингэснээр дэлгүүрийн sticky хайлтын мөр дээд ирмэгт нааж наалдана (завсар гарахгүй). */
+  main{flex:1; overflow-y:auto; padding:0;}
+  main > section{padding:16px; display:block;}
+  #tab-store{padding:0;}
+  /* Ангиллын товчнууд (баннерын доор) */
+  .cat-chips{display:flex; flex-wrap:wrap; gap:7px; padding:12px 16px 0;}
+  .cat-chip{background:#1B4244; border:1px solid #2A5658; border-radius:99px;
+    padding:6px 11px; color:#eee; font-size:11.5px; font-weight:700; white-space:nowrap;
+    cursor:pointer; user-select:none;}
+  .cat-chip.sel{background:#1FBFAB; border-color:#1FBFAB; color:#fff;}
+  /* Дэлгэрэнгүйн 2 товч */
+  .dbtns{display:flex; gap:8px; margin-top:14px;}
+  .dbtns .nf-btn{flex:1; margin:0; text-align:center; width:auto;}
+  .nf-btn.gray{background:#235052;}
+  /* Дэлгүүрийн доод мэдээлэл */
+  .nf-footer{margin-top:26px; border-top:1px solid #1B4244; padding:18px 16px 10px;
+    color:#9a9a9a; font-size:12.5px; line-height:2;}
+  .nf-footer b{color:#ddd; font-size:13.5px;}
+  /* «Шалгах» хэсэг — дэлгүүртэй ижил хар загвар */
+  #tab-check{background:#0C2224; min-height:100%;}
+  #tab-check .card{background:#123032; border-color:#1E4749;}
+  #tab-check h2{color:#fff;}
+  #tab-check label{color:#bbb;}
+  #tab-check .note{color:#9a9a9a;}
+  #tab-check input{background:#1B4244; border-color:#2A5658; color:#fff;}
+  #tab-check input::placeholder{color:#888;}
+  #tab-check .btn-primary{background:#1FBFAB;}
+  #tab-check .btn-primary:active{background:#159884;}
+  #tab-check .kv{border-bottom-color:#1E4749;}
+  #tab-check .kv .k{color:#9a9a9a;}
+  #tab-check .kv .v{color:#fff;}
+  /* Доод талын навигац */
+  .bottomnav{display:flex; background:#123032; border-top:1px solid #1E4749; flex-shrink:0;}
+  .btab{flex:1; text-align:center; padding:8px 2px 12px; cursor:pointer; color:#8a8a8a;
+    font-size:10.5px; font-weight:600; user-select:none;}
+  .btab .ic{display:block; font-size:20px; margin-bottom:2px;}
+  .btab.active{color:#fff;}
+  /* Компьютерын дээд навигац — утсанд нуугдана */
+  .webbar{display:none;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;}
+  .card h2{font-size:15px; margin-bottom:10px; color:var(--ink);}
+  label{display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; font-weight:600;}
+  input[type=text], input[type=tel], textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    font-size:15px; color:var(--ink); background:#fbfcfe;}
+  input:focus, textarea:focus{outline:2px solid var(--brand); border-color:transparent;}
+  .btn{display:block; width:100%; padding:13px; border:none; border-radius:12px; font-size:15px;
+    font-weight:700; cursor:pointer; margin-top:12px;}
+  .btn-primary{background:var(--brand); color:#fff;}
+  .btn-primary:active{background:var(--brand-dark);}
+  .btn-secondary{background:#e9edf7; color:var(--brand);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  .photo-drop{border:2px dashed #b9c4dd; border-radius:14px; padding:26px 14px; text-align:center;
+    color:var(--muted); cursor:pointer; background:#fbfcfe;}
+  .photo-drop b{color:var(--brand); font-size:15px;}
+  .photo-drop span{display:block; font-size:12px; margin-top:4px;}
+  #preview{width:100%; border-radius:12px; margin-top:10px; display:none; max-height:220px; object-fit:cover;}
+  .spin{display:inline-block; width:16px; height:16px; border:2.5px solid #fff; border-top-color:transparent;
+    border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:8px;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .badge{display:inline-block; padding:4px 10px; border-radius:99px; font-size:11.5px; font-weight:700;}
+  .badge-ok{background:#d9f3e8; color:var(--ok);}
+  .badge-wait{background:#fdeed6; color:var(--warn);}
+  .reg{border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; background:#fff;}
+  .reg .row{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .reg .name{font-weight:700; font-size:14.5px; color:var(--ink);}
+  .reg .meta{font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.5;}
+  .toggle-btn{padding:7px 12px; border-radius:10px; border:1px solid var(--line); background:#f4f6fb;
+    font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap;}
+  .toggle-btn.on{background:#d9f3e8; color:var(--ok); border-color:#a9e3cc;}
+  .result-box{margin-top:14px;}
+  .kv{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{color:var(--muted);}
+  .kv .v{font-weight:700; color:var(--ink); text-align:right;}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:14px 0;}
+  .note{font-size:12px; color:var(--muted); line-height:1.5; margin-top:8px;}
+  .alert{background:#fdeaea; color:var(--danger); border-radius:10px; padding:10px 12px; font-size:13px; margin-top:10px; display:none;}
+  .success-flash{background:#d9f3e8; color:var(--ok); border-radius:10px; padding:10px 12px; font-size:13px;
+    margin-top:10px; display:none; font-weight:600;}
+  .plate{font-family:ui-monospace,monospace; background:#1a2233; color:#fff; padding:2px 8px; border-radius:6px; letter-spacing:1px;}
+  details{margin-top:6px;}
+  summary{font-size:12.5px; color:var(--brand); cursor:pointer; font-weight:600;}
+  .demo-tag{background:#fff3; border:1px solid #fff5; color:#fff; font-size:10.5px; padding:2px 8px;
+    border-radius:99px; float:right; margin-top:2px;}
+  .key-btn{float:right; cursor:pointer; font-size:15px; background:#fff3; border:1px solid #fff5;
+    border-radius:99px; padding:2px 9px; margin-left:8px; user-select:none;}
+  .key-btn:active{background:#fff5;}
+  /* ---- Netflix маягийн дэлгүүр ---- */
+  .nf{background:#0C2224; margin:0; padding:0 0 24px; min-height:100%;}
+  .nf-hero{position:relative; height:230px; display:flex; align-items:flex-end;
+    background:linear-gradient(160deg,#2FB9A7 0%,#12716A 55%,#0C2224 100%); overflow:hidden;}
+  .nf-hero .big{position:absolute; top:14px; right:10px; font-size:110px; opacity:.9;
+    filter:drop-shadow(0 8px 18px rgba(0,0,0,.5));}
+  .nf-hero-vid{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
+  /* ---- Баннер v2: зүүн контент + баруун барааны карт (карусель) ---- */
+  .nf-hero.hero2{height:auto; min-height:250px; display:block;}
+  .hero2-grid{position:relative; display:flex; gap:16px; padding:24px 16px;
+    align-items:center; justify-content:space-between; z-index:1;}
+  .hero2-left{flex:1; min-width:0;}
+  .hero2-price{color:#fff; font-size:26px; font-weight:800; margin:10px 0 14px;}
+  .hero2-price .old{color:#c9c9c9; text-decoration:line-through; font-size:15px;
+    font-weight:600; margin-right:8px;}
+  .hero2-btns{display:flex; gap:8px; flex-wrap:wrap;}
+  .hbtn{border:none; border-radius:99px; padding:11px 18px; font-weight:800;
+    font-size:12.5px; cursor:pointer; letter-spacing:.6px;}
+  .hbtn.red{background:#1FBFAB; color:#fff;}
+  .hbtn.red:active{background:#159884;}
+  .hbtn.white{background:#fff; color:#1a1a1a;}
+  .hbtn.ghost{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.55);}
+  .hero2-card{position:relative; width:160px; height:195px; border-radius:16px;
+    background:repeating-linear-gradient(45deg,#E7F4F0 0 12px,#DAECE7 12px 24px);
+    box-shadow:0 14px 34px rgba(0,0,0,.35); flex-shrink:0; cursor:pointer;
+    overflow:hidden; display:flex; align-items:center; justify-content:center;}
+  .hero2-card img{width:100%; height:100%; object-fit:contain; background:#fff;}
+  .hc-name{color:#6F8F8A; font-size:10.5px; letter-spacing:2px; text-transform:uppercase;
+    text-align:center; padding:0 12px; line-height:1.8;}
+  .sale{position:absolute; top:10px; left:10px; background:#1FBFAB; color:#fff;
+    font-size:11px; font-weight:800; border-radius:99px; padding:5px 12px;
+    box-shadow:0 4px 10px rgba(31,191,171,.45); z-index:2;}
+  .hc-arrows{position:absolute; bottom:10px; right:10px; display:flex; gap:8px; z-index:2;}
+  .hc-arrows button{width:34px; height:34px; border-radius:99px; border:none;
+    background:#235052; color:#fff; font-size:16px; cursor:pointer; line-height:1;}
+  .hc-arrows button:hover{background:#2C5F61;}
+  .nf-hero-body{position:relative; padding:16px; width:100%;
+    background:linear-gradient(transparent,rgba(20,20,20,.95));}
+  .nf-hero-tag{color:#1FBFAB; font-size:11px; font-weight:800; letter-spacing:2px;}
+  .nf-hero-title{color:#fff; font-size:24px; font-weight:800; margin:2px 0;}
+  .nf-hero-sub{color:#cfcfcf; font-size:13px; margin-bottom:10px;}
+  .nf-btn{display:inline-block; background:#1FBFAB; color:#fff; border:none; border-radius:6px;
+    padding:9px 18px; font-size:14px; font-weight:800; cursor:pointer;}
+  .nf-btn:active{background:#159884;}
+  .nf-row{margin-top:18px; padding-left:16px;}
+  .nf-row-title{color:#fff; font-size:15px; font-weight:700; margin-bottom:8px;}
+  .nf-scroll{display:flex; gap:10px; overflow-x:auto; padding:2px 16px 8px 0;
+    scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+  .nf-scroll::-webkit-scrollbar{display:none;}
+  .nf-card{min-width:112px; width:112px; height:158px; border-radius:8px; flex-shrink:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .15s; position:relative; overflow:hidden;}
+  .nf-card:hover{transform:scale(1.06);}
+  .nf-card .em{font-size:42px; filter:drop-shadow(0 4px 8px rgba(0,0,0,.4));}
+  .nf-card .nm{color:#fff; font-size:11.5px; font-weight:700; text-align:center;
+    padding:0 8px; margin-top:8px; line-height:1.3;}
+  .nf-card .pr{color:#8FE3D2; font-size:11.5px; font-weight:800; margin-top:3px;}
+  .nf-flash{display:none; position:sticky; top:8px; z-index:5; margin:0 16px;
+    background:#0e9f6e; color:#fff; border-radius:8px; padding:10px 14px;
+    font-size:13px; font-weight:700; box-shadow:0 4px 14px rgba(0,0,0,.4);}
+  /* ---- TMS маягийн дэлгүүрийн нэмэлт ---- */
+  .nf-topbar{display:flex; gap:10px; padding:12px 16px; align-items:center;
+    background:#0C2224; position:sticky; top:0; z-index:6;}
+  .nf-topbar input{flex:1; background:#1B4244; border:1px solid #2A5658; border-radius:8px;
+    padding:9px 12px; color:#fff; font-size:14px;}
+  .nf-topbar input::placeholder{color:#888;}
+  .nf-cart{position:relative; background:#1B4244; border:1px solid #2A5658; border-radius:8px;
+    padding:8px 12px; font-size:16px; cursor:pointer; color:#fff;}
+  .nf-cart-badge{position:absolute; top:-7px; right:-7px; background:#1FBFAB; color:#fff;
+    font-size:10px; font-weight:800; border-radius:99px; padding:1px 6px;}
+  .rank{position:absolute; top:6px; left:6px; background:#1FBFAB; color:#fff; font-size:10px;
+    font-weight:800; border-radius:5px; padding:2px 6px;}
+  .card-old{color:#bbb; text-decoration:line-through; font-size:10px;}
+  /* fixed — цонх ямагт харагдаж буй дэлгэцийн доод хэсгээс гарч ирнэ */
+  .ov{position:fixed; inset:0; background:rgba(0,0,0,.72); display:none; z-index:50;
+    align-items:flex-end; justify-content:center;}
+  .ov.open{display:flex;}
+  .sheet{background:#123032; width:100%; max-width:420px; max-height:85vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:18px 16px 24px; color:#fff;
+    animation:slideUp .22s ease-out;}
+  @keyframes slideUp{from{transform:translateY(40%);opacity:.4}to{transform:none;opacity:1}}
+  .sheet h3{font-size:17px; font-weight:800; margin-bottom:8px;}
+  .sheet .close{float:right; cursor:pointer; background:#235052; border-radius:99px;
+    width:28px; height:28px; text-align:center; line-height:28px; font-size:13px; color:#fff;}
+  .sheet .muted{color:#aaa; font-size:12.5px;}
+  .old-price{color:#9a9a9a; text-decoration:line-through; font-size:13px; margin-right:6px;}
+  .new-price{color:#fff; font-weight:800; font-size:19px;}
+  .disc-badge{background:#1FBFAB; color:#fff; border-radius:5px; font-size:11px;
+    font-weight:800; padding:2px 6px; margin-left:6px; vertical-align:2px;}
+  .qty{display:flex; align-items:center; gap:16px; margin:12px 0;}
+  .qty button{width:34px; height:34px; border-radius:8px; border:none; background:#235052;
+    color:#fff; font-size:18px; cursor:pointer;}
+  .qty b{font-size:16px;}
+  .info-btns{display:flex; gap:8px; margin:10px 0;}
+  .info-btns button{flex:1; background:#1B4244; border:1px solid #2A5658; color:#eee;
+    border-radius:8px; padding:9px 4px; font-size:11.5px; cursor:pointer;}
+  .cart-line{display:flex; align-items:center; gap:10px; border-bottom:1px solid #1E4749;
+    padding:10px 0; font-size:13.5px;}
+  .cart-line .em2{font-size:26px;}
+  .cart-line .rm{background:none; border:none; color:#1FBFAB; cursor:pointer; font-size:15px;}
+  .sheet input, .sheet select{width:100%; background:#1B4244; border:1px solid #2A5658;
+    border-radius:8px; padding:10px; color:#fff; font-size:14px; margin-top:4px;}
+  .sheet label{color:#bbb; font-size:12.5px; font-weight:600; margin-top:10px; display:block;}
+  .paychoice{display:flex; gap:8px; margin-top:6px;}
+  .paychoice .pc{flex:1; border:1px solid #2A5658; border-radius:10px; padding:10px;
+    text-align:center; cursor:pointer; font-size:12.5px; font-weight:700; color:#ddd;}
+  .pc.sel{border-color:#1FBFAB; background:#2a1416; color:#fff;}
+  .qr-box{width:190px; height:190px; margin:12px auto; background:#fff; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; color:#333; font-weight:700;
+    text-align:center; font-size:12.5px; padding:10px;}
+  .qr-box img{width:100%; height:100%; object-fit:contain;}
+  .banks{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;}
+  .banks button{background:#1B4244; border:1px solid #2A5658; color:#eee; border-radius:8px;
+    padding:10px; font-size:12.5px; font-weight:700; cursor:pointer;}
+  .paid-ok{text-align:center; padding:18px 0;}
+  .paid-ok .big{font-size:52px;}
+  .sheet .nf-btn{width:100%; text-align:center; margin-top:14px;}
+  .total-row{display:flex; justify-content:space-between; font-size:15px; font-weight:800;
+    padding:12px 0 4px;}
+  .free-ship{color:#7ee2b0; font-size:12px; margin-top:2px;}
+  /* ---- Админ: бараа/захиалга ---- */
+  .padm{display:flex; align-items:center; gap:10px; border:1px solid var(--line);
+    border-radius:12px; padding:10px; margin-bottom:8px; background:#fff;}
+  .padm .em3{font-size:26px;}
+  .padm .pi{flex:1; min-width:0;}
+  .padm .pn{font-weight:700; font-size:13.5px; color:var(--ink);}
+  .padm .pm{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .padm button{border:1px solid var(--line); background:#f4f6fb; border-radius:8px;
+    padding:6px 9px; font-size:12px; cursor:pointer;}
+  .padm .star{font-size:15px; background:none; border:none;}
+  .padm .star.on{filter:none;} .padm .star.off{filter:grayscale(1); opacity:.45;}
+  .ochips{display:flex; flex-wrap:wrap; gap:5px; margin:6px 0;}
+  .ochip{background:#eef1f8; border:1px solid var(--line); border-radius:99px;
+    padding:3px 9px; font-size:11.5px; color:var(--ink);}
+  .obadge{display:inline-block; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:800;}
+  .ob-paid{background:#d9f3e8; color:var(--ok);}
+  .ob-pend{background:#fdeed6; color:var(--warn);}
+  .ob-cash{background:#e8ecf7; color:var(--brand);}
+  .stat-btn{border:1px solid var(--line); background:#f4f6fb; border-radius:8px;
+    padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; color:var(--brand);}
+  .ent-btn{border:1px solid var(--line); background:#f4f6fb; border-radius:8px;
+    padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; color:var(--muted);}
+  .ent-btn.on{background:#d9f3e8; color:var(--ok); border-color:#a9e3cc;}
+  /* ---- Барааны зураг ---- */
+  .pimg{position:absolute; top:0; left:0; width:100%; height:92px; object-fit:cover;
+    border-radius:8px 8px 0 0;}
+  .nf-card.has-img{justify-content:flex-end; padding-bottom:10px;}
+  .thumb{width:36px; height:36px; border-radius:8px; object-fit:cover; flex-shrink:0;}
+  .pe-prev{width:100%; max-height:150px; object-fit:contain; border-radius:10px;
+    background:#fff; margin-top:8px;}
+  /* ---- TMS маягийн барааны карт ---- */
+  .pcard{width:150px; flex-shrink:0; cursor:pointer;}
+  .pcard-img{width:150px; height:200px; border-radius:14px; background-color:#DCEFEA;
+    background-size:cover; background-position:center; position:relative;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .pcard-em{font-size:56px;}
+  .fav{position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:99px;
+    background:#fff; border:none; cursor:pointer; font-size:15px; color:#444;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.15);}
+  .fav.on{color:#1FBFAB;}
+  /* Товчнууд хулгана очиход л гарч ирнэ */
+  .pcard-btns{position:absolute; left:8px; right:8px; bottom:10px; display:flex; gap:7px;
+    opacity:0; transform:translateY(6px); transition:opacity .18s, transform .18s; pointer-events:none;}
+  .pcard:hover .pcard-btns{opacity:1; transform:none; pointer-events:auto;}
+  /* Зүүн тийш өөрөө урсах эгнээ */
+  .marquee{overflow:hidden;}
+  .mtrack{display:flex; width:max-content; animation:scrollL var(--dur,40s) linear infinite;}
+  .mtrack .pcard{margin-right:12px;}
+  .marquee:hover .mtrack{animation-play-state:paused;}
+  @keyframes scrollL{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .pcb{flex:1; border:none; border-radius:99px; padding:9px 0; font-size:12px; font-weight:700;
+    cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .pcb.pink{background:#1FBFAB; color:#fff;}
+  .pcb.dark{background:#123032; color:#fff;}
+  .pcard-name{color:#fff; font-size:13px; font-weight:600; margin-top:8px; line-height:1.35;
+    min-height:35px; overflow:hidden;}
+  .pcard-row{display:flex; justify-content:space-between; align-items:center; margin-top:2px;}
+  .pcard-price{color:#fff; font-weight:800; font-size:14.5px;}
+  .pcard-old{color:#999; text-decoration:line-through; font-size:11px; margin-right:5px; font-weight:600;}
+  .pcard-rate{color:#ccc; font-size:12px;}
+  /* Ангиллын баннер */
+  .cat-banner{height:92px; border-radius:12px; background-size:cover; background-position:center;
+    background-color:#1B4244; margin:0 16px 10px 0;}
+  /* Popup баннер */
+  .ov.center{align-items:center; padding:24px;}
+  .popup-card{background:#123032; border-radius:18px; max-width:340px; width:100%;
+    overflow:hidden; position:relative; color:#fff;}
+  /* Зураггүй барааны хоосон placeholder */
+  .noimg{width:54px; height:54px; border-radius:10px; background:rgba(255,255,255,.12);
+    border:1px dashed rgba(255,255,255,.35);}
+  .noimg.sm{width:36px; height:36px; flex-shrink:0;}
+  .noimg.lg{width:100%; height:140px; display:flex; align-items:center; justify-content:center;
+    color:#777; font-size:13px;}
+  .noimg.light{background:#eef1f8; border-color:#c9d2e6;}
+  /* ================= КОМПЬЮТЕР: жинхэнэ вэбсайт харагдац ================= */
+  @media (min-width:768px){
+    body{padding:0;}
+    .phone{max-width:100%; height:100vh; border-radius:0; box-shadow:none;}
+    /* Контент референстэй ижил ~1240px өргөнд төвлөрнө */
+    :root{--gut:max(28px, calc((100% - 1240px)/2));}
+    /* Доод цэс болон дэлгүүрийн тусдаа хайлтын мөрийг нууж,
+       бүгдийг нэг дээд мөрөнд (webbar) байрлуулна */
+    .bottomnav{display:none;}
+    .nf-topbar{display:none;}
+    .webbar{display:flex; align-items:center; gap:26px; padding:15px var(--gut);
+      background:#0C2224; border-bottom:1px solid #1E4749; flex-shrink:0;}
+    .webbar .logo{color:#fff; font-size:19px; font-weight:800; letter-spacing:.3px; display:flex; align-items:center; gap:9px;
+      cursor:pointer; white-space:nowrap;}
+    .logo-mark{width:26px; height:26px; flex-shrink:0;}
+  .webtabs{display:flex; gap:20px; align-items:center;}
+    .webtab{color:#bbb; font-size:14px; font-weight:600; cursor:pointer;
+      padding:6px 0; white-space:nowrap; transition:color .15s;}
+    .webtab:hover{color:#fff;}
+    .webtab.active{color:#fff; box-shadow:inset 0 -2px 0 #1FBFAB;}
+    .webbar input{flex:1; max-width:420px; margin-left:auto; background:#1B4244;
+      border:1px solid #2A5658; border-radius:10px; padding:10px 14px;
+      color:#fff; font-size:14px;}
+    .webbar input::placeholder{color:#888;}
+    .nf-hero{min-height:380px; height:auto;}
+    .nf-hero-tag{font-size:12px;}
+    .nf-hero-title{font-size:40px;}
+    .nf-hero-sub{font-size:15px; margin-bottom:14px;}
+    .nf-btn{padding:11px 26px; font-size:15px;}
+    .hero2-grid{padding:46px var(--gut); gap:40px;}
+    .hero2-price{font-size:34px; margin:14px 0 18px;}
+    .hero2-price .old{font-size:18px;}
+    .hbtn{padding:13px 26px; font-size:14px;}
+    .hero2-card{width:300px; height:345px; border-radius:20px;}
+    .hc-name{font-size:12.5px;}
+    .hc-arrows button{width:40px; height:40px; font-size:18px;}
+    .cat-chips{padding:20px var(--gut) 0;}
+    .cat-chip{font-size:12.5px; padding:8px 16px; transition:background .15s;}
+    .cat-chip:hover{background:#2A5658;}
+    .cat-chip.sel:hover{background:#1FBFAB;}
+    /* Эгнээ хоёр талдаа ижил зайтай — контент 1240px хүрээнд тэгш багтана */
+    .nf-row{padding-left:var(--gut); padding-right:var(--gut); margin-top:28px;}
+    .cat-banner{margin-right:0;}
+    .nf-row-title{font-size:18px; margin-bottom:12px;}
+    .pcard{width:288px;}
+    .pcard-img{width:288px; height:340px;}
+    .pcard-img{transition:transform .2s;}
+    .pcard:hover .pcard-img{transform:scale(1.04);}
+    .pcard-name{font-size:15px; min-height:40px;}
+    .mtrack .pcard{margin-right:14px;}
+    .cat-banner{height:150px; margin-right:0; border-radius:14px;}
+    .nf-footer{padding:30px var(--gut) 18px; font-size:13px;}
+    /* Бусад хэсгүүд — төвд, унших өргөнтэй */
+    #tab-worker,#tab-list,#tab-admin,#tab-shopadm,#tab-orders{max-width:760px; margin:0 auto;}
+    #tab-check .card{max-width:640px; margin-left:auto; margin-right:auto;}
+    /* Цонхнууд — доороос биш, дэлгэцийн төвд */
+    .ov{align-items:center; padding:32px;}
+    .sheet{border-radius:18px; max-width:560px; animation:none;}
+    /* Popup баннер томхон */
+    .popup-card{max-width:400px;}
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- Компьютерын дээд навигац: лого · цэс · хайлт · сагс · түлхүүр (утсанд нуугдана) -->
+  <header class="webbar">
+    <span class="logo" onclick="showTab('store')"><svg class="logo-mark" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="44" stroke="#2FB9A7" stroke-opacity=".3" stroke-width="5"/><circle cx="50" cy="50" r="31" stroke="#2FB9A7" stroke-opacity=".6" stroke-width="7"/><circle cx="50" cy="50" r="18" stroke="#35D0BA" stroke-width="9"/><circle cx="50" cy="50" r="7" fill="#35D0BA"/></svg>CoreDelivery<span style="color:#35D0BA">.</span></span>
+    <nav class="webtabs" id="webtabs"></nav>
+    <input id="webSearch" placeholder="Бараа хайх..."
+      oninput="document.getElementById('shopSearch').value=this.value;renderShop()">
+    <button class="nf-cart" onclick="openCart()">🛒<span id="cartCount2" class="nf-cart-badge" style="display:none">0</span></button>
+    <button class="nf-cart" id="adminKey2" onclick="showTab('admin')" title="Админ нэвтрэх">🔑</button>
+  </header>
+  <main>
+
+    <!-- ================= WORKER TAB (зөвхөн админ) ================= -->
+    <section id="tab-worker" style="display:none">
+      <div class="card">
+        <h2>1. Жолоочийн мэдээлэл</h2>
+        <label>Жолоочийн утас</label>
+        <input type="tel" id="drvPhone" placeholder="9911XXXX">
+        <label>Машины улсын дугаар</label>
+        <input type="text" id="drvPlate" placeholder="1234 УБА" style="text-transform:uppercase">
+      </div>
+
+      <div class="card">
+        <h2>2. Цаасны зураг дарах <span style="font-weight:400;color:var(--muted);font-size:12px">(заавал биш)</span></h2>
+        <p class="note" style="margin:0 0 10px">Зураг дарвал AI мэдээллийг автоматаар бөглөнө. Эсвэл доорх хэсэгт гараар шууд оруулж болно.</p>
+        <div class="photo-drop" onclick="document.getElementById('photoInput').click()">
+          <b>📷 Зураг дарах / сонгох</b>
+          <span>Хаяг, утас, нэр бичсэн цаасны зураг</span>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden onchange="onPhoto(this)">
+        <img id="preview" alt="preview">
+        <button class="btn btn-primary" id="ocrBtn" style="display:none" onclick="runOCR()">🔎 Зургийг уншуулах</button>
+        <button class="btn btn-secondary" id="demoBtn" style="display:none" onclick="fillDemo()">📝 Демо өгөгдлөөр турших</button>
+        <div class="alert" id="ocrErr"></div>
+        <p class="note" id="ocrProgress" style="display:none"></p>
+        <details>
+          <summary>⚙️ Гар бичмэлийг илүү сайн таниулах (үнэгүй)</summary>
+          <label>Google Gemini API түлхүүр (заавал биш)</label>
+          <input type="text" id="apiKey" placeholder="AIza... (хоосон бол Tesseract үнэгүй танина)" oninput="updateMode()">
+          <p class="note">Түлхүүргүй үед Tesseract бүрэн үнэгүй танина (хэвлэмэл/цэвэр бичигт сайн). Гар бичмэлийг илүү сайн таниулахыг хүсвэл aistudio.google.com/apikey хаягаас Google акаунтаараа <b>үнэгүй</b> түлхүүр аваад энд оруулна — карт шаардахгүй.</p>
+        </details>
+      </div>
+
+      <div class="card" id="formCard">
+        <h2>3. Хүлээн авагчид <span style="font-weight:400;color:var(--muted);font-size:12px">(нэг дор олныг оруулж болно)</span></h2>
+        <div id="recipList"></div>
+        <button class="btn btn-secondary" onclick="addRecip()">＋ Хүлээн авагч нэмэх</button>
+        <button class="btn btn-primary" onclick="saveReg()">✅ Бүх бүртгэлийг үүсгэх</button>
+        <div class="success-flash" id="saveOk">Бүртгэл амжилттай үүслээ!</div>
+      </div>
+    </section>
+
+    <!-- ================= LIST TAB ================= -->
+    <section id="tab-list" style="display:none">
+      <div class="card">
+        <h2>Өнөөдрийн бүртгэлүүд</h2>
+        <div id="regList"><p class="empty">Бүртгэл алга. «Ажилтан» хэсгээс нэмнэ үү.</p></div>
+        <p class="note">«Машинд тавьсан» товчийг дарж ачааг машинд ачсан эсэхийг тэмдэглэнэ.</p>
+      </div>
+    </section>
+
+    <!-- ================= ADMIN: БАРААНЫ УДИРДЛАГА ================= -->
+    <section id="tab-shopadm" style="display:none">
+      <div class="card">
+        <h2>🛍 Дэлгүүрийн бараа</h2>
+        <p class="note" style="margin-top:0">⭐ дарж Bestseller болгоно. Өөрчлөлт дэлгүүрт шууд харагдана.</p>
+        <button class="btn btn-primary" onclick="openProdEdit(0)">＋ Шинэ бараа нэмэх</button>
+        <button class="btn btn-secondary" onclick="openContentEdit()">🎨 Контент засах (баннер · ангилал · popup · хаяг)</button>
+        <div id="prodAdmList" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- ================= ADMIN: ЗАХИАЛГУУД ================= -->
+    <section id="tab-orders" style="display:none">
+      <div class="card">
+        <h2>🧾 Дэлгүүрийн захиалгууд</h2>
+        <p class="note" style="margin-top:0">Статус: Хүлээгдэж буй → Бэлтгэгдэж буй → Хүргэгдсэн. QPay-аар төлөгдсөнийг гараар өөрчлөх боломжгүй.</p>
+        <div id="orderAdmList"></div>
+      </div>
+    </section>
+
+    <!-- ================= STORE TAB — Netflix загвар + TMS функц ================= -->
+    <section id="tab-store">
+      <div class="nf">
+        <div class="nf-topbar">
+          <input id="shopSearch" placeholder="Бараа хайх..." oninput="renderShop()">
+          <button class="nf-cart" onclick="openCart()">🛒<span id="cartCount" class="nf-cart-badge" style="display:none">0</span></button>
+          <button class="nf-cart" id="adminKey" onclick="showTab('admin')" title="Админ нэвтрэх">🔑</button>
+        </div>
+        <div id="shopHero"></div>
+        <div class="nf-flash" id="orderOk"></div>
+        <div id="storeRows"></div>
+      </div>
+    </section>
+
+    <!-- Дэлгүүрийн overlay цонхнууд -->
+    <div class="ov" id="ovDetail"><div class="sheet" id="shDetail"></div></div>
+    <div class="ov" id="ovInfo"><div class="sheet" id="shInfo"></div></div>
+    <div class="ov" id="ovCart"><div class="sheet" id="shCart"></div></div>
+    <div class="ov" id="ovCheckout"><div class="sheet" id="shCheckout"></div></div>
+    <div class="ov" id="ovQpay"><div class="sheet" id="shQpay"></div></div>
+    <div class="ov" id="ovProdEdit"><div class="sheet" id="shProdEdit"></div></div>
+    <div class="ov" id="ovBannerEdit"><div class="sheet" id="shBannerEdit"></div></div>
+    <div class="ov center" id="ovPopup"><div class="popup-card" id="shPopup"></div></div>
+
+    <!-- ================= ADMIN LOGIN TAB ================= -->
+    <section id="tab-admin" style="display:none">
+      <div class="card">
+        <h2>🔑 Админ нэвтрэх</h2>
+        <p class="note" style="margin-top:0">Зөвхөн админ «Ажилтан» болон «Бүртгэл» цэсийг харна.</p>
+        <label>Нууц үг</label>
+        <input type="text" id="adminPass" placeholder="Нууц үг" autocomplete="off">
+        <button class="btn btn-primary" onclick="adminLogin()">Нэвтрэх</button>
+        <div class="alert" id="adminErr"></div>
+        <p class="note">Демо нууц үг: <b>1234</b> (жинхэнэ хувилбарт сервер дээр шалгана)</p>
+      </div>
+    </section>
+
+    <!-- ================= CHECK TAB ================= -->
+    <section id="tab-check" style="display:none">
+      <div class="card">
+        <h2>Хүргэлтээ шалгах</h2>
+        <p class="note" style="margin-top:0">Хүлээн авагч та утасныхаа дугаарыг оруулна уу.</p>
+        <label>Утасны дугаар</label>
+        <input type="tel" id="checkPhone" placeholder="9911XXXX">
+        <button class="btn btn-primary" onclick="checkReg()">🔍 Шалгах</button>
+        <div class="alert" id="checkErr"></div>
+        <div class="result-box" id="checkResult"></div>
+      </div>
+    </section>
+
+  </main>
+  <nav class="bottomnav" id="tabbar"></nav>
+</div>
+
+<script>
+// ======== In-memory store (демо) ========
+let regs = [];
+let photoDataUrl = null;
+let photoMediaType = 'image/jpeg';
+
+// ======== Эрхийн удирдлага: энгийн хэрэглэгч зөвхөн «Шалгах», админ бүгдийг харна ========
+let isAdmin = false;
+let currentTab = 'store';   // апп нээгдэхэд Дэлгүүрээс эхэлнэ
+const ADMIN_PASS = '1234'; // Демо. Жинхэнэ хувилбарт сервер дээр шалгана.
+
+function tabDefs(){
+  return isAdmin
+    ? [['worker','📸','Ажилтан'],['list','📋','Хүргэлт'],['shopadm','🛍','Бараа'],['orders','🧾','Захиалга'],['logout','🚪','Гарах']]
+    : [['store','🛍','Дэлгүүр'],['check','🔍','Шалгах']];
+}
+function renderTabs(){
+  document.getElementById('tabbar').innerHTML = tabDefs().map(([k,ic,l])=>
+    `<div class="btab ${k===currentTab?'active':''}" onclick="showTab('${k}')"><span class="ic">${ic}</span>${l}</div>`).join('');
+  // Компьютерын дээд цэс — лого шиг текстэн холбоосууд
+  const wt = document.getElementById('webtabs');
+  if(wt) wt.innerHTML = tabDefs().map(([k,ic,l])=>
+    `<span class="webtab ${k===currentTab?'active':''}" onclick="showTab('${k}')">${l}</span>`).join('');
+  // Админ нэвтрэх түлхүүр — зөвхөн энгийн хэрэглэгчид харагдана
+  document.getElementById('adminKey').style.display = isAdmin ? 'none' : '';
+  const k2 = document.getElementById('adminKey2');
+  if(k2) k2.style.display = isAdmin ? 'none' : '';
+}
+function showTab(name){
+  if(name==='logout'){ isAdmin=false; name='store'; }
+  currentTab = name;
+  ['worker','list','check','admin','store','shopadm','orders'].forEach(n=>{
+    document.getElementById('tab-'+n).style.display = (n===name)?'':'none';
+  });
+  renderTabs();
+  if(name==='list') renderList();
+  if(name==='shopadm') renderShopAdm();
+  if(name==='orders') renderOrders();
+}
+// =====================================================================
+//  ДЭЛГҮҮР — Touch Me Slowly-тэй ижил функц (Netflix загвараар)
+//  Supabase холболт: доорх 2 утгыг бөглөвөл жинхэнэ өгөгдөлтэй ажиллана.
+//  Хоосон үед демо өгөгдлөөр бүрэн урсгалыг харуулна.
+// =====================================================================
+const SUPABASE_URL = '';        // ж: https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = '';   // anon (public) key — service_role-ийг ХЭЗЭЭ Ч БҮҮ ОРУУЛ
+const SHOP_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
+
+// Демо бараанууд (products хүснэгтийн бүтэцтэй ижил талбарууд)
+const DEMO_PRODUCTS = [
+  {id:1, e:'', name:'Массажны тос — жожоба 250мл', category:'Массаж', vendor:'Nature Co', price:45000, discount:20, rating:4.8, stock:12, best_seller:true,
+   description:'Байгалийн жожоба тосон суурьтай, арьсыг зөөлрүүлж чийгшүүлнэ.', usage:'Багахан хэмжээгээр авч алгаараа дулаацуулаад зөөлөн иллэг хийнэ.', caution:'Зөвхөн гадуур хэрэглэнэ. Нүдэнд оруулахгүй.'},
+  {id:2, e:'', name:'Анхилуун лаа — сарнай', category:'Лаа ба үнэр', vendor:'AromaLux', price:32000, discount:0, rating:4.6, stock:20, best_seller:true,
+   description:'Байгалийн лав, сарнайн эфирийн тостой. 30 цаг асна.', usage:'Салхигүй тэгш гадаргуу дээр асаана.', caution:'Асаасан лааг хараа хяналтгүй орхихгүй.'},
+  {id:3, e:'', name:'Торгон нүдний баг', category:'Хэрэгсэл', vendor:'SilkTouch', price:25000, discount:10, rating:4.5, stock:15, best_seller:false,
+   description:'100% торгон даавуутай, зөөлөн нүдний баг.', usage:'Унтахын өмнө нүдэндээ тааруулж зүүнэ.', caution:'Гараар зөөлөн угааж сүүдэрт хатаана.'},
+  {id:4, e:'', name:'Ваннын давс — сарнай', category:'Арчилгаа', vendor:'RoseSpa', price:18000, discount:0, rating:4.3, stock:30, best_seller:false,
+   description:'Сарнайн дэлбээтэй байгалийн ваннын давс.', usage:'Бүлээн усанд 2-3 халбага уусгана.', caution:'Арьсны харшилтай бол эмчээс зөвлөгөө авна.'},
+  {id:5, e:'', name:'Иллэгийн халуун чулуун багц', category:'Массаж', vendor:'StoneART', price:58000, discount:15, rating:4.7, stock:8, best_seller:true,
+   description:'Базальт чулуун 8 ширхэгтэй иллэгийн багц.', usage:'Бүлээн усанд халааж, алчуураар барьж хэрэглэнэ.', caution:'Хэт халуун чулууг арьсанд шууд хүргэхгүй.'},
+  {id:6, e:'', name:'Анхилуун тосны диффузер', category:'Лаа ба үнэр', vendor:'AromaLux', price:89000, discount:25, rating:4.9, stock:5, best_seller:true,
+   description:'Ультрасоник диффузер, 7 өнгийн гэрэлтэй, 300мл.', usage:'Ус + 3-5 дусал эфирийн тос хийж асаана.', caution:'Усгүй хооллохгүй. Хүүхдээс хол байлгана.'},
+  {id:7, e:'', name:'Биеийн тос — ваниль', category:'Арчилгаа', vendor:'Nature Co', price:28000, discount:0, rating:4.4, stock:18, best_seller:false,
+   description:'Ванилийн үнэртэй биеийн чийгшүүлэгч тос.', usage:'Усанд орсны дараа биед түрхэнэ.', caution:'Гадуур хэрэглээнд зориулагдсан.'},
+  {id:8, e:'', name:'Үнэрт савангийн бэлгийн багц', category:'Арчилгаа', vendor:'RoseSpa', price:36000, discount:30, rating:4.2, stock:10, best_seller:false,
+   description:'4 өөр үнэртэй гар аргаар хийсэн савангийн багц.', usage:'Өдөр тутмын хэрэглээнд.', caution:'Нүдэнд орвол усаар зайлна.'},
+  {id:9, e:'', name:'Хөвөн халат', category:'Хэрэгсэл', vendor:'SilkTouch', price:120000, discount:10, rating:4.8, stock:6, best_seller:false,
+   description:'100% хөвөн, зөөлөн үслэг доторлогоотой халат.', usage:'30°C-д машинд угааж болно.', caution:'Цайруулагч хэрэглэхгүй.'},
+  {id:10, e:'', name:'Массажны бөмбөлөг', category:'Массаж', vendor:'StoneART', price:22000, discount:0, rating:4.1, stock:25, best_seller:false,
+   description:'Булчин сулруулах зориулалттай массажны бөмбөлөг.', usage:'Хана эсвэл шаланд тулж эргэлдүүлнэ.', caution:'Нурууны өвчтэй бол эмчээс асууна.'},
+];
+const CARD_BG = ['#0F4F4A','#156A62','#0C3B3D','#1A7A6E','#123F4A','#0E5A50','#17877A','#0F3335'];
+
+let shopProducts = DEMO_PRODUCTS.slice();
+let cart = [];            // [{id, qty}]
+let dQty = 1;             // дэлгэрэнгүй дэх тоо ширхэг
+let curPid = null;
+let payMethod = 'QPay';
+let qpayTimer = null;
+let demoPollCount = 0;
+// Демо захиалгууд (админы жагсаалт хоосон харагдахгүйн тулд 2 жишээтэй)
+let demoOrders = [
+  {id:'TMS10241', date:'2026-08-06', created_at:'2026-08-06T14:32:00',
+   items:[{product_id:1,name:'Массажны тос — жожоба 250мл',qty:1,price:36000},{product_id:2,name:'Анхилуун лаа — сарнай',qty:2,price:32000}],
+   total:100000, customer:'Оюунаа', phone:'99887766', address:'СБД, 8-р хороо, 45-12 тоот', city:'Улаанбаатар',
+   pay:'QPay', status:'Бэлтгэгдэж буй', payment_status:'paid', qpay_invoice_id:'INV-1', entered:true},
+  {id:'TMS10242', date:'2026-08-07', created_at:'2026-08-07T09:15:00',
+   items:[{product_id:6,name:'Анхилуун тосны диффузер',qty:1,price:66750}],
+   total:66750, customer:'Тэмүүлэн', phone:'88112233', address:'ХУД, 3-р хороо, Гоёо хотхон 21-5', city:'Улаанбаатар',
+   pay:'Бэлнээр (хүргэх үед)', status:'Хүлээгдэж буй', payment_status:'', qpay_invoice_id:'', entered:false},
+];
+
+// --- Бизнес дүрэм №1: хямдарсан нэгж үнэ ---
+const unit = (p)=> Math.round(p.price * (1 - (p.discount||0)/100));
+const fmt = (n)=> '₮' + n.toLocaleString('en-US');
+const prod = (id)=> shopProducts.find(p=>p.id===id);
+const cardBg = (p)=> CARD_BG[p.id % CARD_BG.length];
+
+// --- Supabase-аас бараа татах (түлхүүр орсон үед) ---
+async function loadShop(){
+  if(!SHOP_DEMO){
+    try{
+      const res = await fetch(SUPABASE_URL+'/rest/v1/products?select=*&order=id',{
+        headers:{apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY}});
+      if(res.ok){ shopProducts = await res.json(); }
+    }catch(e){ /* холболт амжилтгүй бол демо өгөгдлөөр үргэлжилнэ */ }
+  }
+  renderShop();
+}
+
+let favs = new Set(); // хадгалсан бараанууд (♡)
+function toggleFav(id){
+  if(favs.has(id)) favs.delete(id); else favs.add(id);
+  renderShop();
+}
+// Карт дээрх хурдан товчнууд
+function quickCart(id){
+  const ex = cart.find(c=>c.id===id);
+  if(ex) ex.qty += 1; else cart.push({id, qty:1});
+  updateCartBadge();
+  flash('✓ Сагсанд нэмэгдлээ');
+}
+function quickBuy(id){
+  buyNowItem = {id, qty:1};
+  openCheckout(true);
+}
+function cardHtml(p, rank){
+  const u = unit(p);
+  return `<div class="pcard" onclick="openDetail(${p.id})">
+    <div class="pcard-img"${p.image?` style="background-image:url('${p.image}')"`:''}>
+      ${(!p.image && p.e)?`<span class="pcard-em">${p.e}</span>`:''}
+      ${rank?`<span class="rank">#${rank}</span>`:''}
+      ${p.discount?`<span class="rank" style="left:auto;right:44px;background:#0e9f6e">−${p.discount}%</span>`:''}
+      <button class="fav ${favs.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleFav(${p.id})">${favs.has(p.id)?'♥':'♡'}</button>
+      <div class="pcard-btns">
+        <button class="pcb pink" onclick="event.stopPropagation();quickCart(${p.id})">Сагсанд</button>
+        <button class="pcb dark" onclick="event.stopPropagation();quickBuy(${p.id})">Авах</button>
+      </div>
+    </div>
+    <div class="pcard-name">${p.name}</div>
+    <div class="pcard-row">
+      <span class="pcard-price">${p.discount?`<span class="pcard-old">${fmt(p.price)}</span>`:''}${fmt(u)}</span>
+      <span class="pcard-rate">★ ${p.rating||'-'}</span>
+    </div>
+  </div>`;
+}
+function rowHtml(title, items, ranked, staticRow, bannerImg){
+  if(!items.length) return '';
+  const cards = items.map((p,i)=>cardHtml(p, ranked?i+1:0)).join('');
+  const bn = bannerImg ? `<div class="cat-banner" style="background-image:url('${bannerImg}')"></div>` : '';
+  if(staticRow || items.length < 3){
+    // Цөөн бараатай эсвэл хайлтын үр дүн — энгийн гүйлгэдэг эгнээ
+    return `<div class="nf-row">${bn}<div class="nf-row-title">${title}</div>
+      <div class="nf-scroll">${cards}</div></div>`;
+  }
+  // Зүүн тийш тасралтгүй урсана (хулгана очиход түр зогсоно)
+  return `<div class="nf-row">${bn}<div class="nf-row-title">${title}</div>
+    <div class="marquee"><div class="mtrack" style="--dur:${items.length*7}s">${cards}${cards}</div></div></div>`;
+}
+
+// Дэлгүүрийн холбоо барих мэдээлэл (доод хэсэгт харагдана — өөрийнхөөрөө солино)
+const SHOP_INFO = {
+  address:'Улаанбаатар, Сүхбаатар дүүрэг, 1-р хороо, Их тойруу 25',
+  phone:'7711-2233, 9911-2233',
+  email:'info@delguur.mn',
+  hours:'Даваа–Ням 10:00–21:00',
+};
+let catFilter = '';
+function setCat(c){ catFilter = c; renderShop(); }
+// Баннерын агуулга — админы «Контент засах» цонхноос засна.
+// Хоосон талбар нь эхний bestseller барааны мэдээллээр автоматаар бөглөгдөнө.
+let banner = { image:'', video:'', tag:'', title:'', subtitle:'' };
+// Сайтын бусад контент — мөн админаас засагдана
+let siteContent = {
+  catBanners: {},   // { 'Ангиллын нэр': зураг } — ангилал бүрийн дээрх баннер
+  popup: { enabled:true, image:'',
+    title:'Тавтай морил! 🎉',
+    text:'Шинэ хэрэглэгчдэд эхний захиалгад 10% хямдрал. Хүргэлт үргэлж үнэгүй!',
+    btn:'Дэлгүүр үзэх' },
+  contact: { ...SHOP_INFO },
+};
+let popupShown = false;
+function maybePopup(){
+  if(popupShown || !siteContent.popup.enabled) return;
+  popupShown = true;
+  const pp = siteContent.popup;
+  document.getElementById('shPopup').innerHTML = `
+    <span class="close" onclick="closeOv('ovPopup')" style="position:absolute;top:10px;right:10px;z-index:2">✕</span>
+    ${pp.image?`<img src="${pp.image}" style="width:100%;height:170px;object-fit:cover" alt="">`:''}
+    <div style="padding:20px 18px">
+      <h3 style="margin-bottom:8px">${pp.title||''}</h3>
+      <p style="color:#bbb;font-size:13.5px;line-height:1.6">${pp.text||''}</p>
+      <button class="nf-btn" style="width:100%;margin-top:16px" onclick="closeOv('ovPopup')">${pp.btn||'Хаах'}</button>
+    </div>`;
+  openOv('ovPopup');
+}
+function catEmoji(c){
+  const p = shopProducts.find(x=>x.category===c && x.e);
+  return (p && p.e) || '';
+}
+function footerHtml(){
+  const ct = siteContent.contact;
+  return `<div class="nf-footer">
+    <b>Холбоо барих</b><br>
+    📍 ${ct.address}<br>
+    ☎ ${ct.phone}<br>
+    ✉ ${ct.email}<br>
+    🕐 ${ct.hours}
+  </div>`;
+}
+// ---- Баннер: карусель — ‹ › сумаар онцлох бараагаа солино ----
+let heroIdx = 0;
+function heroList(){
+  const best = shopProducts.filter(p=>p.best_seller);
+  return best.length ? best : shopProducts;
+}
+function heroNav(d){
+  const list = heroList();
+  if(!list.length) return;
+  heroIdx = (heroIdx + d + list.length) % list.length;
+  renderHero();
+}
+function renderHero(){
+  const list = heroList();
+  const hp = list.length ? list[heroIdx % list.length] : null;
+  if(!hp){ document.getElementById('shopHero').innerHTML=''; return; }
+  const bImg = banner.image || '';
+  const bVid = banner.video || '';
+  const bTag = banner.tag || ((hp.category||'').toUpperCase() + ' · ОНЦЛОХ');
+  const bTitle = banner.title || hp.name;
+  const bSub = banner.subtitle || '';
+  const u = unit(hp);
+  document.getElementById('shopHero').innerHTML = `
+    <div class="nf-hero hero2"${(!bVid && bImg)?` style="background:url('${bImg}') center/cover no-repeat"`:''}>
+      ${bVid?`<video class="nf-hero-vid" src="${bVid}" autoplay muted loop playsinline></video>`:''}
+      <div class="hero2-grid">
+        <div class="hero2-left">
+          <div class="nf-hero-tag">${bTag}</div>
+          <div class="nf-hero-title">${bTitle}</div>
+          ${bSub?`<div class="nf-hero-sub">${bSub}</div>`:''}
+          <div class="hero2-price">
+            ${hp.discount?`<span class="old">${fmt(hp.price)}</span>`:''}${fmt(u)}
+          </div>
+          <div class="hero2-btns">
+            <button class="hbtn red" onclick="quickCart(${hp.id})">САГСЛАХ</button>
+            <button class="hbtn white" onclick="quickBuy(${hp.id})">ШУУД АВАХ</button>
+            <button class="hbtn ghost" onclick="openDetail(${hp.id})">ДЭЛГЭРЭНГҮЙ</button>
+          </div>
+        </div>
+        <div class="hero2-card" onclick="openDetail(${hp.id})">
+          ${hp.discount?`<span class="sale">SALE</span>`:''}
+          ${hp.image?`<img src="${hp.image}" alt="">`:`<span class="hc-name">${hp.name}</span>`}
+          <div class="hc-arrows">
+            <button onclick="event.stopPropagation();heroNav(-1)">‹</button>
+            <button onclick="event.stopPropagation();heroNav(1)">›</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+function renderShop(){
+  const q = (document.getElementById('shopSearch').value||'').trim().toLowerCase();
+  renderHero();
+  const box = document.getElementById('storeRows');
+  if(q){
+    const found = shopProducts.filter(p=>(p.name+' '+(p.vendor||'')+' '+(p.category||'')).toLowerCase().includes(q));
+    box.innerHTML = (found.length
+      ? rowHtml('🔎 Хайлтын үр дүн ('+found.length+')', found, false, true)
+      : '<p style="color:#888;text-align:center;padding:24px 16px;font-size:13px">Илэрц олдсонгүй.</p>')
+      + footerHtml();
+    return;
+  }
+  const best = shopProducts.filter(p=>p.best_seller);
+  const sale = shopProducts.filter(p=>p.discount>0);
+  const cats = [...new Set(shopProducts.map(p=>p.category).filter(Boolean))];
+  // Баннерын яг доор — ангиллын товчнууд
+  const chips = `<div class="cat-chips">
+    <div class="cat-chip ${!catFilter?'sel':''}" onclick="setCat('')">Бүгд</div>
+    ${cats.map(c=>{const em=catEmoji(c); return `<div class="cat-chip ${c===catFilter?'sel':''}" onclick="setCat('${c.replace(/'/g,'')}')">${em?em+' ':''}${c}</div>`;}).join('')}
+  </div>`;
+  const rows = catFilter
+    ? rowHtml(catFilter, shopProducts.filter(p=>p.category===catFilter), false, false, siteContent.catBanners[catFilter])
+    : rowHtml('🔥 Эрэлттэй', best, true) +
+      rowHtml('💥 Хямдрал', sale, false) +
+      cats.map(c=>rowHtml(c, shopProducts.filter(p=>p.category===c), false, false, siteContent.catBanners[c])).join('');
+  box.innerHTML = chips + rows + footerHtml();
+}
+
+// ---------- Барааны дэлгэрэнгүй ----------
+function openDetail(id){
+  curPid = id; dQty = 1;
+  const p = prod(id); if(!p) return;
+  const u = unit(p);
+  document.getElementById('shDetail').innerHTML = `
+    <span class="close" onclick="closeOv('ovDetail')">✕</span>
+    ${p.image
+      ? `<img src="${p.image}" alt="" style="width:100%;max-height:210px;object-fit:contain;border-radius:12px;background:#fff">`
+      : (p.e
+        ? `<div style="text-align:center;font-size:76px;padding:6px 0">${p.e}</div>`
+        : `<div class="noimg lg">Зураг оруулаагүй</div>`)}
+    <h3>${p.name}</h3>
+    <div class="muted">${p.vendor||''} · ⭐ ${p.rating||'-'} · Үлдэгдэл: ${p.stock??'-'}</div>
+    <div style="margin:10px 0">
+      ${p.discount?`<span class="old-price">${fmt(p.price)}</span>`:''}
+      <span class="new-price">${fmt(u)}</span>
+      ${p.discount?`<span class="disc-badge">−${p.discount}%</span>`:''}
+    </div>
+    <div class="info-btns">
+      <button onclick="openInfo('description')">📄 Тайлбар</button>
+      <button onclick="openInfo('usage')">📋 Хэрэглэх заавар</button>
+      <button onclick="openInfo('caution')">⚠️ Анхаарах зүйлс</button>
+    </div>
+    <div class="qty">
+      <button onclick="chQty(-1)">−</button><b id="dQtyView">1</b><button onclick="chQty(1)">+</button>
+    </div>
+    <div class="dbtns">
+      <button class="nf-btn gray" onclick="addToCart()">🛒 Сагслах</button>
+      <button class="nf-btn" onclick="buyNow()">⚡ Шууд авах — <span id="dSum">${fmt(u)}</span></button>
+    </div>`;
+  openOv('ovDetail');
+}
+function chQty(d){
+  const p = prod(curPid);
+  dQty = Math.max(1, Math.min((p.stock||99), dQty+d));
+  document.getElementById('dQtyView').textContent = dQty;
+  document.getElementById('dSum').textContent = fmt(unit(p)*dQty);
+}
+function openInfo(field){
+  const p = prod(curPid); if(!p) return;
+  const titles = {description:'📄 Тайлбар', usage:'📋 Хэрэглэх заавар', caution:'⚠️ Анхаарах зүйлс'};
+  document.getElementById('shInfo').innerHTML = `
+    <span class="close" onclick="closeOv('ovInfo')">✕</span>
+    <h3>${titles[field]}</h3>
+    <p style="font-size:13.5px;line-height:1.6;color:#ddd">${p[field]||'Мэдээлэл оруулаагүй байна.'}</p>`;
+  openOv('ovInfo');
+}
+function addToCart(){
+  const ex = cart.find(c=>c.id===curPid);
+  if(ex) ex.qty += dQty; else cart.push({id:curPid, qty:dQty});
+  closeOv('ovDetail');
+  updateCartBadge();
+  flash('✓ Сагсанд нэмэгдлээ');
+}
+function updateCartBadge(){
+  const n = cart.reduce((s,c)=>s+c.qty,0);
+  ['cartCount','cartCount2'].forEach(id=>{
+    const b = document.getElementById(id);
+    if(b){ b.textContent = n; b.style.display = n?'':'none'; }
+  });
+}
+function flash(msg){
+  const ok = document.getElementById('orderOk');
+  ok.textContent = msg; ok.style.display='block';
+  setTimeout(()=>{ ok.style.display='none'; }, 2200);
+}
+
+// ---------- Сагс ----------
+function openCart(){
+  const sh = document.getElementById('shCart');
+  if(!cart.length){
+    sh.innerHTML = `<span class="close" onclick="closeOv('ovCart')">✕</span>
+      <h3>🛒 Сагс</h3><p class="muted" style="text-align:center;padding:20px 0">Сагс хоосон байна.</p>`;
+  }else{
+    const total = cart.reduce((s,c)=>s+unit(prod(c.id))*c.qty,0);
+    sh.innerHTML = `<span class="close" onclick="closeOv('ovCart')">✕</span><h3>🛒 Сагс</h3>` +
+      cart.map(c=>{const p=prod(c.id); return `
+        <div class="cart-line">
+          ${p.image?`<img class="thumb" src="${p.image}" alt="">`:(p.e?`<span class="em2">${p.e}</span>`:'<div class="noimg sm"></div>')}
+          <div style="flex:1"><b>${p.name}</b><br><span class="muted">${fmt(unit(p))} × ${c.qty}</span></div>
+          <div class="qty" style="margin:0;gap:8px">
+            <button style="width:26px;height:26px;font-size:14px" onclick="cQty(${c.id},-1)">−</button>
+            <b style="font-size:13px">${c.qty}</b>
+            <button style="width:26px;height:26px;font-size:14px" onclick="cQty(${c.id},1)">+</button>
+          </div>
+          <button class="rm" onclick="rmCart(${c.id})">🗑</button>
+        </div>`;}).join('') +
+      `<div class="total-row"><span>Нийт</span><span>${fmt(total)}</span></div>
+       <div class="free-ship">🚚 Хүргэлт ҮНЭГҮЙ — нэмэлт төлбөргүй</div>
+       <button class="nf-btn" onclick="openCheckout()">Захиалах</button>`;
+  }
+  openOv('ovCart');
+}
+function cQty(id,d){
+  const c = cart.find(x=>x.id===id); if(!c) return;
+  c.qty = Math.max(1, c.qty+d);
+  updateCartBadge(); openCart();
+}
+function rmCart(id){
+  cart = cart.filter(c=>c.id!==id);
+  updateCartBadge(); openCart();
+}
+
+// ---------- Захиалга ----------
+let buyNowItem = null; // «Шууд авах» — сагсанд нөлөөлөхгүй шууд захиална
+function buyNow(){
+  buyNowItem = {id:curPid, qty:dQty};
+  closeOv('ovDetail');
+  openCheckout(true);
+}
+function openCheckout(direct){
+  if(!direct) buyNowItem = null;
+  closeOv('ovCart');
+  payMethod = 'QPay';
+  const src = buyNowItem ? [buyNowItem] : cart;
+  const total = src.reduce((s,c)=>s+unit(prod(c.id))*c.qty,0);
+  document.getElementById('shCheckout').innerHTML = `
+    <span class="close" onclick="closeOv('ovCheckout')">✕</span>
+    <h3>📦 Захиалга</h3>
+    <label>Нэр *</label><input id="coName">
+    <label>Утас (8 цифр) *</label><input id="coPhone" inputmode="numeric" maxlength="8"
+      oninput="this.value=this.value.replace(/\\D/g,'').slice(0,8)">
+    <label>Хаяг *</label><input id="coAddr">
+    <label>Хот *</label><input id="coCity" value="Улаанбаатар">
+    <label>Төлбөрийн хэлбэр</label>
+    <div class="paychoice">
+      <div class="pc sel" id="pcQ" onclick="setPay('QPay')">📱 QPay</div>
+      <div class="pc" id="pcC" onclick="setPay('cash')">💵 Бэлнээр (хүргэх үед)</div>
+    </div>
+    <div class="total-row"><span>Нийт</span><span>${fmt(total)}</span></div>
+    <div class="free-ship">🚚 Хүргэлт үнэгүй · Төлбөр төлөгдсөний маргааш 12:00–18:00-д хүргэнэ</div>
+    <div class="alert" id="coErr" style="margin-top:10px"></div>
+    <button class="nf-btn" onclick="submitOrder()">Захиалга үүсгэх</button>`;
+  openOv('ovCheckout');
+}
+function setPay(m){
+  payMethod = (m==='QPay')?'QPay':'Бэлнээр (хүргэх үед)';
+  document.getElementById('pcQ').classList.toggle('sel', m==='QPay');
+  document.getElementById('pcC').classList.toggle('sel', m!=='QPay');
+}
+async function submitOrder(){
+  const name = document.getElementById('coName').value.trim();
+  const phone = document.getElementById('coPhone').value;
+  const addr = document.getElementById('coAddr').value.trim();
+  const city = document.getElementById('coCity').value.trim();
+  const err = document.getElementById('coErr');
+  err.style.display='none';
+  if(!name || !addr || !city){ err.textContent='Бүх талбарыг бөглөнө үү.'; err.style.display='block'; return; }
+  if(phone.length!==8){ err.textContent='Утасны дугаар яг 8 цифр байх ёстой.'; err.style.display='block'; return; }
+  const src = buyNowItem ? [buyNowItem] : cart;
+  const items = src.map(c=>{const p=prod(c.id); return {product_id:p.id, name:p.name, qty:c.qty, price:unit(p)};});
+  const total = items.reduce((s,i)=>s+i.price*i.qty,0);
+  const order = {
+    id:'TMS'+String(Math.floor(10000+Math.random()*90000)),
+    date:new Date().toISOString().slice(0,10),
+    items, total, customer:name, phone, address:addr, city,
+    pay:payMethod, status:'Хүлээгдэж буй',
+    payment_status: payMethod==='QPay'?'pending':'', qpay_invoice_id:''
+  };
+  if(!SHOP_DEMO){
+    try{
+      await fetch(SUPABASE_URL+'/rest/v1/rpc/place_order',{
+        method:'POST',
+        headers:{apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY, 'content-type':'application/json'},
+        body:JSON.stringify({p_order:order})});
+    }catch(e){ err.textContent='Захиалга илгээхэд алдаа: '+e.message; err.style.display='block'; return; }
+  }else{
+    demoOrders.push(order);
+  }
+  if(!buyNowItem){ cart = []; updateCartBadge(); }
+  buyNowItem = null;
+  closeOv('ovCheckout');
+  if(order.pay==='QPay') openQpay(order); else showSuccess(order);
+}
+
+// ---------- QPay ----------
+async function openQpay(order){
+  demoPollCount = 0;
+  const sh = document.getElementById('shQpay');
+  sh.innerHTML = `
+    <span class="close" onclick="closeQpay()">✕</span>
+    <h3>📱 QPay төлбөр</h3>
+    <div class="muted">Захиалга: ${order.id} · ${fmt(order.total)}</div>
+    <div class="qr-box" id="qrBox">QR ачаалж байна...</div>
+    <div class="muted" id="qpayStatus" style="text-align:center">Төлбөр хүлээж байна...</div>
+    <div class="banks" id="bankBtns"></div>`;
+  openOv('ovQpay');
+  if(SHOP_DEMO){
+    document.getElementById('qrBox').innerHTML = 'ДЕМО QR<br><br>Жинхэнэ горимд QPay-ийн жинхэнэ QR код энд гарна';
+    document.getElementById('bankBtns').innerHTML =
+      ['Хаан банк','Голомт','Худалдаа хөгжил','Хас банк'].map(b=>
+        `<button onclick="flashQpay()">${b}</button>`).join('');
+    qpayTimer = setInterval(()=>{ demoPollCount++;
+      if(demoPollCount>=2){ clearInterval(qpayTimer); showPaid(order); }
+    }, 3500);
+  }else{
+    try{
+      const res = await fetch(SUPABASE_URL+'/functions/v1/qpay-invoice',{
+        method:'POST',
+        headers:{Authorization:'Bearer '+SUPABASE_ANON_KEY, 'content-type':'application/json'},
+        body:JSON.stringify({order_id:order.id})});
+      const inv = await res.json();
+      document.getElementById('qrBox').innerHTML = `<img src="data:image/png;base64,${inv.qr_image}" alt="QR">`;
+      document.getElementById('bankBtns').innerHTML = (inv.urls||[]).map(u=>
+        `<button onclick="window.open('${u.link}','_blank')">${u.name}</button>`).join('');
+      qpayTimer = setInterval(async ()=>{
+        try{
+          const r = await fetch(SUPABASE_URL+'/functions/v1/qpay-callback?order_id='+order.id);
+          const j = await r.json();
+          if(j.paid){ clearInterval(qpayTimer); showPaid(order); }
+        }catch(e){}
+      }, 3500);
+    }catch(e){
+      document.getElementById('qrBox').textContent = 'Нэхэмжлэл үүсгэхэд алдаа гарлаа';
+    }
+  }
+}
+function flashQpay(){ document.getElementById('qpayStatus').textContent='Демо горимд банкны апп нээгдэхгүй — жинхэнэ горимд шууд нээгдэнэ.'; }
+function closeQpay(){ if(qpayTimer) clearInterval(qpayTimer); closeOv('ovQpay'); }
+function showPaid(order){
+  document.getElementById('shQpay').innerHTML = `
+    <span class="close" onclick="closeQpay()">✕</span>
+    <div class="paid-ok">
+      <div class="big">✅</div>
+      <h3>Төлбөр амжилттай!</h3>
+      <p class="muted">Захиалга ${order.id} баталгаажлаа.<br>Төлбөр төлөгдсөний маргааш (12:00–18:00) таны гарт очих болно.</p>
+    </div>`;
+}
+function showSuccess(order){
+  document.getElementById('shInfo').innerHTML = `
+    <span class="close" onclick="closeOv('ovInfo')">✕</span>
+    <div class="paid-ok">
+      <div class="big">✅</div>
+      <h3>Захиалга амжилттай!</h3>
+      <p class="muted">Захиалга ${order.id} бүртгэгдлээ.<br>Хүргэлтийн үед бэлнээр төлнө үү.<br>Маргааш 12:00–18:00-д хүргэнэ.</p>
+    </div>`;
+  openOv('ovInfo');
+}
+
+// ---------- Overlay удирдлага ----------
+function openOv(id){ document.getElementById(id).classList.add('open'); }
+function closeOv(id){ document.getElementById(id).classList.remove('open'); }
+
+// =====================================================================
+//  АДМИН: Барааны удирдлага (өөрчлөлт дэлгүүрт шууд тусна)
+//  Жинхэнэ горимд Supabase имэйл/нууц үгээр нэвтэрсэн админ
+//  products хүснэгтэд шууд CRUD хийнэ (RLS: authenticated).
+// =====================================================================
+let editPid = 0;
+let peImage = ''; // засаж буй барааны зураг (dataURL эсвэл URL)
+function onPeImg(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = (e)=>{
+    peImage = e.target.result;
+    const im = document.getElementById('peImgPrev');
+    im.src = peImage; im.style.display='';
+  };
+  rd.readAsDataURL(f);
+}
+function clearPeImg(){
+  peImage = '';
+  const im = document.getElementById('peImgPrev');
+  im.src=''; im.style.display='none';
+}
+function renderShopAdm(){
+  document.getElementById('prodAdmList').innerHTML = shopProducts.map(p=>`
+    <div class="padm">
+      ${p.image?`<img class="thumb" src="${p.image}" alt="">`:(p.e?`<span class="em3">${p.e}</span>`:'<div class="noimg sm light"></div>')}
+      <div class="pi">
+        <div class="pn">${p.name}</div>
+        <div class="pm">${p.category||'—'} · ${fmt(p.price)}${p.discount?' · −'+p.discount+'%':''} · Үлд: ${p.stock??'-'}</div>
+      </div>
+      <button class="star ${p.best_seller?'on':'off'}" title="Bestseller" onclick="toggleBest(${p.id})">⭐</button>
+      <button onclick="openProdEdit(${p.id})">✏️</button>
+      <button onclick="delProd(${p.id})">🗑</button>
+    </div>`).join('') || '<p class="empty">Бараа алга.</p>';
+}
+function toggleBest(id){
+  const p = prod(id); if(p){ p.best_seller = !p.best_seller; renderShopAdm(); renderShop(); }
+}
+function delProd(id){
+  shopProducts = shopProducts.filter(p=>p.id!==id);
+  cart = cart.filter(c=>c.id!==id); updateCartBadge();
+  renderShopAdm(); renderShop();
+}
+function openProdEdit(id){
+  editPid = id;
+  const p = id ? prod(id) : {e:'🛍', name:'', category:'', vendor:'', price:0, discount:0, stock:0,
+    best_seller:false, description:'', usage:'', caution:'', image:''};
+  peImage = p.image || '';
+  document.getElementById('shProdEdit').innerHTML = `
+    <span class="close" onclick="closeOv('ovProdEdit')">✕</span>
+    <h3>${id?'✏️ Бараа засах':'＋ Шинэ бараа'}</h3>
+    <label>Зураг</label>
+    <div style="display:flex;gap:8px">
+      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+        onclick="document.getElementById('peImgFile').click()">📷 Зураг сонгох</button>
+      <button class="nf-btn" style="margin:0;background:#235052" onclick="clearPeImg()">🗑</button>
+    </div>
+    <input type="file" id="peImgFile" accept="image/*" hidden onchange="onPeImg(this)">
+    <img id="peImgPrev" class="pe-prev" style="display:${p.image?'':'none'}" src="${p.image||''}">
+    <label>Эмодзи (зураггүй үед харагдана)</label><input id="peE" value="${p.e||''}" maxlength="4">
+    <label>Нэр *</label><input id="peName" value="${(p.name||'').replace(/"/g,'&quot;')}">
+    <label>Ангилал</label><input id="peCat" value="${p.category||''}">
+    <label>Брэнд</label><input id="peVendor" value="${p.vendor||''}">
+    <label>Үнэ (₮) *</label><input id="pePrice" inputmode="numeric" value="${p.price||0}"
+      oninput="this.value=this.value.replace(/\\D/g,'')">
+    <label>Хямдрал (%)</label><input id="peDisc" inputmode="numeric" value="${p.discount||0}"
+      oninput="this.value=this.value.replace(/\\D/g,'').slice(0,3)">
+    <label>Үлдэгдэл</label><input id="peStock" inputmode="numeric" value="${p.stock||0}"
+      oninput="this.value=this.value.replace(/\\D/g,'')">
+    <label>Тайлбар</label><input id="peDesc" value="${(p.description||'').replace(/"/g,'&quot;')}">
+    <label>Хэрэглэх заавар</label><input id="peUsage" value="${(p.usage||'').replace(/"/g,'&quot;')}">
+    <label>Анхаарах зүйлс</label><input id="peCaution" value="${(p.caution||'').replace(/"/g,'&quot;')}">
+    <div class="alert" id="peErr" style="margin-top:10px"></div>
+    <button class="nf-btn" onclick="saveProd()">💾 Хадгалах</button>`;
+  openOv('ovProdEdit');
+}
+function saveProd(){
+  const name = document.getElementById('peName').value.trim();
+  const price = parseInt(document.getElementById('pePrice').value||'0',10);
+  const err = document.getElementById('peErr');
+  if(!name || !price){ err.textContent='Нэр болон үнийг оруулна уу.'; err.style.display='block'; return; }
+  const disc = Math.min(100, parseInt(document.getElementById('peDisc').value||'0',10));
+  const vals = {
+    image:peImage,
+    e:document.getElementById('peE').value||'🛍', name,
+    category:document.getElementById('peCat').value.trim(),
+    vendor:document.getElementById('peVendor').value.trim(),
+    price, discount:disc,
+    stock:parseInt(document.getElementById('peStock').value||'0',10),
+    description:document.getElementById('peDesc').value.trim(),
+    usage:document.getElementById('peUsage').value.trim(),
+    caution:document.getElementById('peCaution').value.trim(),
+  };
+  if(editPid){
+    Object.assign(prod(editPid), vals);
+  }else{
+    const nid = Math.max(0, ...shopProducts.map(p=>p.id)) + 1;
+    shopProducts.push({id:nid, best_seller:false, rating:0, ...vals});
+  }
+  closeOv('ovProdEdit');
+  renderShopAdm(); renderShop();
+  flash('✓ Бараа хадгалагдлаа');
+}
+
+// ---- Контент засах (админ): баннер + ангиллын баннерууд + popup + хаяг ----
+let bnImage = '', bnVideo = '', ceCatBn = {}, cePopImg = '';
+function fileToVar(input, cb){
+  const f = input.files && input.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = (e)=>cb(e.target.result);
+  rd.readAsDataURL(f);
+}
+function openContentEdit(){
+  bnImage = banner.image || '';
+  bnVideo = banner.video || '';
+  ceCatBn = {...siteContent.catBanners};
+  cePopImg = siteContent.popup.image || '';
+  const cats = [...new Set(shopProducts.map(p=>p.category).filter(Boolean))];
+  const q = (s)=>(s||'').replace(/"/g,'&quot;');
+  const sep = `<div style="border-top:1px solid #333;margin:18px 0 6px"></div>`;
+  document.getElementById('shBannerEdit').innerHTML = `
+    <span class="close" onclick="closeOv('ovBannerEdit')">✕</span>
+    <h3>🎨 Контент засах</h3>
+
+    <h3 style="font-size:14px;margin-top:8px">🖼 Үндсэн баннер</h3>
+    <p class="muted">Хоосон талбар эхний Bestseller-ээс автоматаар бөглөгдөнө.</p>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+        onclick="document.getElementById('bnImgFile').click()">📷 Зураг сонгох</button>
+      <button class="nf-btn" style="margin:0;background:#235052"
+        onclick="bnImage='';updPrev('bnImgPrev','')">🗑</button>
+    </div>
+    <input type="file" id="bnImgFile" accept="image/*" hidden
+      onchange="fileToVar(this,(d)=>{bnImage=d;updPrev('bnImgPrev',d)})">
+    <img id="bnImgPrev" class="pe-prev" style="display:${bnImage?'':'none'}" src="${bnImage||''}">
+    <label>Баннерын бичлэг (байвал зургийг дарж тоглоно)</label>
+    <div style="display:flex;gap:8px">
+      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+        onclick="document.getElementById('bnVidFile').click()">🎬 Бичлэг сонгох</button>
+      <button class="nf-btn" style="margin:0;background:#235052"
+        onclick="bnVideo='';updVidStatus()">🗑</button>
+    </div>
+    <input type="file" id="bnVidFile" accept="video/*" hidden
+      onchange="fileToVar(this,(d)=>{bnVideo=d;updVidStatus()})">
+    <p class="muted" id="bnVidStatus" style="margin-top:6px">${bnVideo?'🎬 Бичлэг орсон ✓':'Бичлэг сонгоогүй'}</p>
+    <video id="bnVidPrev" class="pe-prev" style="display:${bnVideo?'':'none'};max-height:150px"
+      src="${bnVideo||''}" autoplay muted loop playsinline></video>
+    <label>Дээд таг</label><input id="bnTag" value="${q(banner.tag)}" placeholder="ОНЦЛОХ БҮТЭЭГДЭХҮҮН">
+    <label>Гарчиг</label><input id="bnTitle" value="${q(banner.title)}">
+    <label>Дэд бичвэр</label><input id="bnSub" value="${q(banner.subtitle)}">
+
+    ${sep}<h3 style="font-size:14px">🏷 Ангилал бүрийн баннер</h3>
+    <p class="muted">Ангиллын эгнээний дээр харагдана.</p>
+    ${cats.map((c,i)=>`
+      <label>${c}</label>
+      <div style="display:flex;gap:8px">
+        <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+          onclick="document.getElementById('cbF${i}').click()">📷 Зураг сонгох</button>
+        <button class="nf-btn" style="margin:0;background:#235052"
+          onclick="delete ceCatBn['${q(c)}'];updPrev('cbP${i}','')">🗑</button>
+      </div>
+      <input type="file" id="cbF${i}" accept="image/*" hidden
+        onchange="fileToVar(this,(d)=>{ceCatBn['${q(c)}']=d;updPrev('cbP${i}',d)})">
+      <img id="cbP${i}" class="pe-prev" style="display:${ceCatBn[c]?'':'none'}" src="${ceCatBn[c]||''}">`).join('')}
+
+    ${sep}<h3 style="font-size:14px">💬 Popup баннер (нээхэд гарч ирнэ)</h3>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="ppOn" style="width:auto" ${siteContent.popup.enabled?'checked':''}> Идэвхтэй
+    </label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+        onclick="document.getElementById('ppImgFile').click()">📷 Зураг сонгох</button>
+      <button class="nf-btn" style="margin:0;background:#235052"
+        onclick="cePopImg='';updPrev('ppImgPrev','')">🗑</button>
+    </div>
+    <input type="file" id="ppImgFile" accept="image/*" hidden
+      onchange="fileToVar(this,(d)=>{cePopImg=d;updPrev('ppImgPrev',d)})">
+    <img id="ppImgPrev" class="pe-prev" style="display:${cePopImg?'':'none'}" src="${cePopImg||''}">
+    <label>Гарчиг</label><input id="ppTitle" value="${q(siteContent.popup.title)}">
+    <label>Текст</label><input id="ppText" value="${q(siteContent.popup.text)}">
+    <label>Товчны бичиг</label><input id="ppBtn" value="${q(siteContent.popup.btn)}">
+
+    ${sep}<h3 style="font-size:14px">📍 Хаяг, холбоо барих</h3>
+    <label>Хаяг</label><input id="ctAddr" value="${q(siteContent.contact.address)}">
+    <label>Утас</label><input id="ctPhone" value="${q(siteContent.contact.phone)}">
+    <label>Имэйл</label><input id="ctEmail" value="${q(siteContent.contact.email)}">
+    <label>Ажлын цаг</label><input id="ctHours" value="${q(siteContent.contact.hours)}">
+
+    <button class="nf-btn" onclick="saveContent()">💾 Бүгдийг хадгалах</button>
+    <button class="nf-btn" style="background:#235052" onclick="previewPopup()">👁 Popup-г турших</button>`;
+  openOv('ovBannerEdit');
+}
+function updPrev(id, src){
+  const im = document.getElementById(id);
+  if(im){ im.src = src||''; im.style.display = src?'':'none'; }
+}
+function updVidStatus(){
+  const st = document.getElementById('bnVidStatus');
+  const v = document.getElementById('bnVidPrev');
+  if(st) st.textContent = bnVideo ? '🎬 Бичлэг орсон ✓' : 'Бичлэг сонгоогүй';
+  if(v){ v.src = bnVideo||''; v.style.display = bnVideo?'':'none'; }
+}
+function saveContent(){
+  banner = {
+    image: bnImage,
+    video: bnVideo,
+    tag: document.getElementById('bnTag').value.trim(),
+    title: document.getElementById('bnTitle').value.trim(),
+    subtitle: document.getElementById('bnSub').value.trim(),
+  };
+  siteContent.catBanners = {...ceCatBn};
+  siteContent.popup = {
+    enabled: document.getElementById('ppOn').checked,
+    image: cePopImg,
+    title: document.getElementById('ppTitle').value.trim(),
+    text: document.getElementById('ppText').value.trim(),
+    btn: document.getElementById('ppBtn').value.trim() || 'Хаах',
+  };
+  siteContent.contact = {
+    address: document.getElementById('ctAddr').value.trim(),
+    phone: document.getElementById('ctPhone').value.trim(),
+    email: document.getElementById('ctEmail').value.trim(),
+    hours: document.getElementById('ctHours').value.trim(),
+  };
+  closeOv('ovBannerEdit');
+  renderShop();
+  flash('✓ Контент хадгалагдлаа');
+}
+function previewPopup(){
+  saveContent();
+  popupShown = false;
+  maybePopup();
+}
+
+// =====================================================================
+//  АДМИН: Захиалгын жагсаалт
+//  Жинхэнэ горимд orders хүснэгтээс уншина (RLS: authenticated).
+// =====================================================================
+const ORDER_FLOW = ['Хүлээгдэж буй','Бэлтгэгдэж буй','Хүргэгдсэн'];
+function fmtDT(iso){
+  const d = new Date(iso);
+  const p2 = (n)=>String(n).padStart(2,'0');
+  return p2(d.getMonth()+1)+'.'+p2(d.getDate())+' · '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
+function payBadge(o){
+  if(o.pay==='QPay')
+    return o.payment_status==='paid'
+      ? '<span class="obadge ob-paid">QPay · Төлөгдсөн 🔒</span>'
+      : '<span class="obadge ob-pend">QPay · Хүлээгдэж буй</span>';
+  return o.payment_status==='paid'
+    ? '<span class="obadge ob-paid">Бэлэн · Төлөгдсөн</span>'
+    : '<span class="obadge ob-cash">Бэлнээр (хүргэх үед)</span>';
+}
+function renderOrders(){
+  const box = document.getElementById('orderAdmList');
+  if(!demoOrders.length){ box.innerHTML='<p class="empty">Захиалга алга.</p>'; return; }
+  box.innerHTML = demoOrders.slice().reverse().map(o=>`
+    <div class="reg">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:13.5px">${o.id} · ${o.customer}</b>
+        <span class="meta">${fmtDT(o.created_at||o.date)}</span>
+      </div>
+      <div class="ochips">${o.items.map(i=>`<span class="ochip">${i.name} ×${i.qty}</span>`).join('')}</div>
+      <div class="meta" style="font-size:12.5px;color:var(--muted)">
+        📞 ${o.phone} &nbsp; 📍 ${o.city}, ${o.address}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:6px">
+        <span>${payBadge(o)} <b style="font-size:13px">${fmt(o.total)}</b></span>
+        <span style="display:flex;gap:6px">
+          <button class="ent-btn ${o.entered?'on':''}" onclick="toggleEntered('${o.id}')">${o.entered?'Оруулсан ✓':'Оруулаагүй'}</button>
+          <button class="stat-btn" onclick="advStatus('${o.id}')">${o.status}${ORDER_FLOW.indexOf(o.status)<2?' →':''}</button>
+        </span>
+      </div>
+    </div>`).join('');
+}
+function toggleEntered(id){
+  const o = demoOrders.find(x=>x.id===id);
+  if(o){ o.entered=!o.entered; renderOrders(); }
+}
+function advStatus(id){
+  const o = demoOrders.find(x=>x.id===id); if(!o) return;
+  const i = ORDER_FLOW.indexOf(o.status);
+  if(i<ORDER_FLOW.length-1){ o.status = ORDER_FLOW[i+1]; renderOrders(); }
+}
+
+loadShop();
+function adminLogin(){
+  const err = document.getElementById('adminErr');
+  if(document.getElementById('adminPass').value === ADMIN_PASS){
+    isAdmin = true;
+    document.getElementById('adminPass').value='';
+    err.style.display='none';
+    showTab('worker');
+  }else{
+    err.textContent='Нууц үг буруу байна.';
+    err.style.display='block';
+  }
+}
+renderTabs();
+
+function updateMode(){ /* горимын шошго устгагдсан */ }
+
+// ======== Photo ========
+function onPhoto(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  photoMediaType = f.type || 'image/jpeg';
+  const rd = new FileReader();
+  rd.onload = e=>{
+    photoDataUrl = e.target.result;
+    const img = document.getElementById('preview');
+    img.src = photoDataUrl; img.style.display='block';
+    document.getElementById('ocrBtn').style.display='block';
+    document.getElementById('demoBtn').style.display='block';
+    document.getElementById('ocrErr').style.display='none';
+  };
+  rd.readAsDataURL(f);
+}
+
+// ======== OCR ========
+async function runOCR(){
+  const btn = document.getElementById('ocrBtn');
+  const err = document.getElementById('ocrErr');
+  err.style.display='none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Уншиж байна...';
+  try{
+    const key = document.getElementById('apiKey').value.trim();
+    let data;
+    if(key.startsWith('AIza')){
+      data = await geminiOCR(key);   // Gemini — гар бичмэлд илүү сайн (үнэгүй түлхүүр)
+    }else{
+      data = await tesseractOCR();   // Tesseract — бүрэн үнэгүй, түлхүүргүй
+    }
+    addRecipFromOCR(data.phone||'', data.address||'');
+  }catch(e){
+    err.textContent = 'Уншихад алдаа гарлаа: ' + e.message;
+    err.style.display='block';
+  }finally{
+    btn.disabled=false;
+    btn.textContent='🔎 Зургийг уншуулах';
+    document.getElementById('ocrProgress').style.display='none';
+  }
+}
+
+// --- Tesseract.js: бүрэн үнэгүй, түлхүүргүй, browser дотроо танина ---
+async function tesseractOCR(){
+  if(typeof Tesseract === 'undefined')
+    throw new Error('Tesseract ачаалагдсангүй — интернэт холболтоо шалгана уу');
+  const prog = document.getElementById('ocrProgress');
+  prog.style.display='block';
+  try{
+    const result = await Tesseract.recognize(photoDataUrl, 'mon', {
+      logger: (m)=>{
+        if(m.status==='recognizing text')
+          prog.textContent = 'Танилт: ' + Math.round(m.progress*100) + '%';
+        else
+          prog.textContent = 'Бэлтгэж байна... (эхний удаад монгол хэлний сан татна)';
+      }
+    });
+    return parseFreeText(result.data.text || '');
+  }catch(e){
+    const msg = String(e && e.message || e);
+    if(msg.includes('Worker') || msg.includes('blob') || msg.includes('CSP') || msg.includes('origin')){
+      throw new Error('Claude-ийн урьдчилан харах цонх аюулгүй байдлын үүднээс OCR ажиллуулахыг хориглодог. ' +
+        'Файлыг ТАТАЖ АВААД Chrome дээр нээвэл Tesseract бүрэн ажиллана. ' +
+        'Энэ цонхонд урсгалыг «📝 Демо өгөгдлөөр турших» товчоор туршиж болно.');
+    }
+    throw e;
+  }
+}
+
+// Урьдчилан харах цонхонд OCR ажиллахгүй үед урсгалыг туршихад зориулав
+function fillDemo(){
+  document.getElementById('ocrErr').style.display='none';
+  addRecipFromOCR('99112233', 'БЗД, 26-р хороо, Хужирбулангийн зам 14-2 тоот');
+}
+
+// ---- Олон хүлээн авагч: нэг жолооч нэг дор хэд хэдэн хүргэлт бүртгэнэ ----
+let recips = [{phone:'', addr:''}];
+function renderRecips(){
+  document.getElementById('recipList').innerHTML = recips.map((r,i)=>`
+    <div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fbfcfe">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:12.5px;color:var(--muted)">Хүлээн авагч ${i+1}</b>
+        ${recips.length>1?`<button onclick="rmRecip(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">🗑</button>`:''}
+      </div>
+      <label>Утас (8 цифр) *</label>
+      <input type="tel" value="${r.phone}" maxlength="8" inputmode="numeric" placeholder="9911XXXX"
+        oninput="this.value=this.value.replace(/\\D/g,'').slice(0,8); recips[${i}].phone=this.value">
+      <label>Хаяг</label>
+      <input type="text" value="${esc(r.addr)}" oninput="recips[${i}].addr=this.value">
+    </div>`).join('');
+}
+function addRecip(){ recips.push({phone:'', addr:''}); renderRecips(); }
+function rmRecip(i){ recips.splice(i,1); renderRecips(); }
+function addRecipFromOCR(phone, addr){
+  const clean = String(phone||'').replace(/\D/g,'').slice(0,8);
+  const empty = recips.find(r=>!r.phone && !r.addr);
+  if(empty){ empty.phone = clean; empty.addr = addr||''; }
+  else recips.push({phone:clean, addr:addr||''});
+  renderRecips();
+  document.getElementById('formCard').scrollIntoView({behavior:'smooth'});
+}
+
+// Tesseract-ийн уншсан чөлөөт текстээс нэр/утас/хаяг ялгах энгийн дүрэм
+function parseFreeText(txt){
+  const compact = txt.replace(/[\s\-.]/g,'');
+  const phone = (compact.match(/\d{8}/)||[''])[0];
+  const lines = txt.split('\n').map(s=>s.trim()).filter(s=>s.length>1);
+  // Утасны дугаар агуулаагүй, кирилл үсэгтэй мөрүүд
+  const textLines = lines.filter(l=>{
+    const d = l.replace(/\D/g,'');
+    return !(phone && d.includes(phone)) && /[А-Яа-яЁёӨөҮү]/.test(l);
+  });
+  const name = textLines.length ? textLines[0] : '';
+  const address = textLines.slice(1).join(', ');
+  return {name, phone, address};
+}
+
+// --- Google Gemini: үнэгүй түлхүүрээр гар бичмэлийг илүү нарийн танина ---
+async function geminiOCR(key){
+  const base64 = photoDataUrl.split(',')[1];
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(key);
+  let res;
+  try{
+    res = await fetch(url,{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      contents:[{parts:[
+        {inline_data:{mime_type:photoMediaType, data:base64}},
+        {text:'Энэ зурган дээр гараар бичсэн хүргэлтийн мэдээлэл байна. Хүлээн авагчийн нэр, утасны дугаар, хаягийг олж зөвхөн дараах JSON хэлбэрээр хариул, өөр юу ч бүү бич: {"name":"...","phone":"...","address":"..."}. Олдоогүй талбарыг хоосон мөрөөр орхи.'}
+      ]}]
+    })
+    });
+  }catch(e){
+    throw new Error('Gemini-тэй холбогдож чадсангүй. Claude-ийн урьдчилан харах цонхонд гадаад холболт хориотой байж болно — файлыг ТАТАЖ АВААД Chrome дээр нээж үзнэ үү.');
+  }
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error('Gemini API ' + res.status + ' — ' + t.slice(0,120));
+  }
+  const j = await res.json();
+  const txt = ((j.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+  const m = txt.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('AI хариултаас JSON олдсонгүй');
+  return JSON.parse(m[0]);
+}
+
+// ======== Save ========
+let regSeq = 0;
+function saveReg(){
+  const dPhone = document.getElementById('drvPhone').value.trim();
+  const dPlate = document.getElementById('drvPlate').value.trim().toUpperCase();
+  if(!dPhone || !dPlate){ alertTab('Жолоочийн утас болон машины дугаарыг оруулна уу.'); return; }
+  const filled = recips.filter(r=>r.phone || r.addr);
+  if(!filled.length){ alertTab('Хамгийн багадаа нэг хүлээн авагч оруулна уу.'); return; }
+  for(const r of filled){
+    if(r.phone.length!==8){ alertTab('Хүлээн авагч бүрийн утас яг 8 цифр байх ёстой.'); return; }
+  }
+  const time = new Date().toLocaleTimeString('mn-MN',{hour:'2-digit',minute:'2-digit'});
+  filled.forEach(r=>{
+    regs.unshift({
+      id: ++regSeq, time,
+      driverPhone:dPhone, plate:dPlate,
+      phone:r.phone, address:r.addr.trim(),
+      loaded:false, photo:photoDataUrl
+    });
+  });
+  const ok = document.getElementById('saveOk');
+  ok.textContent = filled.length + ' бүртгэл амжилттай үүслээ!';
+  ok.style.display='block';
+  setTimeout(()=>{ ok.style.display='none'; },2500);
+  // Формыг цэвэрлэх (жолоочийн мэдээлэл хэвээр үлдэнэ)
+  recips = [{phone:'', addr:''}];
+  renderRecips();
+  document.getElementById('preview').style.display='none';
+  document.getElementById('ocrBtn').style.display='none';
+  document.getElementById('demoBtn').style.display='none';
+  photoDataUrl=null;
+}
+function alertTab(msg){
+  const err = document.getElementById('ocrErr');
+  err.textContent = msg; err.style.display='block';
+  err.scrollIntoView({behavior:'smooth'});
+}
+
+// ======== List ========
+function renderList(){
+  const box = document.getElementById('regList');
+  if(!regs.length){ box.innerHTML='<p class="empty">Бүртгэл алга. «Ажилтан» хэсгээс нэмнэ үү.</p>'; return; }
+  box.innerHTML = regs.map(r=>`
+    <div class="reg">
+      <div class="row">
+        <div>
+          <div class="name">📱 ${esc(r.phone)}</div>
+          <div class="meta">📍 ${esc(r.address)||'—'}<br>🚗 <span class="plate">${esc(r.plate)}</span> · ☎ ${esc(r.driverPhone)} · 🕐 ${r.time}</div>
+        </div>
+        <button class="toggle-btn ${r.loaded?'on':''}" onclick="toggleLoaded(${r.id})">
+          ${r.loaded?'✅ Машинд тавьсан':'⬜ Машинд тавих'}
+        </button>
+      </div>
+    </div>`).join('');
+}
+function toggleLoaded(id){
+  const r = regs.find(x=>x.id===id);
+  if(r){ r.loaded=!r.loaded; renderList(); }
+}
+function esc(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ======== Check ========
+function checkReg(){
+  const phone = document.getElementById('checkPhone').value.replace(/\D/g,'');
+  const err = document.getElementById('checkErr');
+  const box = document.getElementById('checkResult');
+  err.style.display='none'; box.innerHTML='';
+  if(phone.length<6){ err.textContent='Утасны дугаараа бүрэн оруулна уу.'; err.style.display='block'; return; }
+  const r = regs.find(x=>x.phone===phone);
+  if(!r){ err.textContent='Энэ дугаараар бүртгэл олдсонгүй.'; err.style.display='block'; return; }
+  box.innerHTML = `
+    <div class="card" style="margin-top:12px; margin-bottom:0; background:#16383A">
+      <div class="kv"><span class="k">Статус</span><span class="v">
+        ${r.loaded?'<span class="badge badge-ok">🚚 Машинд ачигдсан — замдаа гарахад бэлэн</span>'
+                  :'<span class="badge badge-wait">⏳ Бүртгэгдсэн — ачигдаагүй</span>'}</span></div>
+      <div class="kv"><span class="k">Жолоочийн утас</span><span class="v">${esc(r.driverPhone)}</span></div>
+      <div class="kv"><span class="k">Машины дугаар</span><span class="v"><span class="plate">${esc(r.plate)}</span></span></div>
+      <div class="kv"><span class="k">Хүргэх хаяг</span><span class="v" style="max-width:60%">${esc(r.address)||'—'}</span></div>
+      <div class="kv"><span class="k">Бүртгэсэн цаг</span><span class="v">${r.time}</span></div>
+    </div>`;
+}
+
+// Эхлүүлэлт — бүх зарлалтын ДАРАА дуудна (TDZ алдаанаас сэргийлнэ)
+renderRecips();
+maybePopup(); // Дэлгүүр нээгдэхэд popup баннер (идэвхтэй үед)
+</script>
+</body>
+</html>
