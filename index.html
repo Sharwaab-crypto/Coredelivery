@@ -387,8 +387,7 @@
       </div>
 
       <div class="card">
-        <h2>2. Цаасны зураг дарах <span style="font-weight:400;color:var(--muted);font-size:12px">(заавал биш)</span></h2>
-        <p class="note" style="margin:0 0 10px">Зураг дарвал AI мэдээллийг автоматаар бөглөнө. Эсвэл доорх хэсэгт гараар шууд оруулж болно.</p>
+        <h2>2. Цаасны зураг</h2>
         <div class="photo-drop" onclick="document.getElementById('photoInput').click()">
           <b>📷 Зураг дарах / сонгох</b>
           <span>Хаяг, утас, нэр бичсэн цаасны зураг</span>
@@ -396,19 +395,18 @@
         <input type="file" id="photoInput" accept="image/*" capture="environment" hidden onchange="onPhoto(this)">
         <img id="preview" alt="preview">
         <button class="btn btn-primary" id="ocrBtn" style="display:none" onclick="runOCR()">🔎 Зургийг уншуулах</button>
-        <button class="btn btn-secondary" id="demoBtn" style="display:none" onclick="fillDemo()">📝 Демо өгөгдлөөр турших</button>
+        <button class="btn btn-secondary" id="demoBtn" style="display:none" onclick="fillDemo()">📝 Жишээгээр бөглөх</button>
         <div class="alert" id="ocrErr"></div>
         <p class="note" id="ocrProgress" style="display:none"></p>
         <details>
-          <summary>⚙️ Гар бичмэлийг илүү сайн таниулах (үнэгүй)</summary>
-          <label>Google Gemini API түлхүүр (заавал биш)</label>
-          <input type="text" id="apiKey" placeholder="AIza... (хоосон бол Tesseract үнэгүй танина)" oninput="updateMode()">
-          <p class="note">Түлхүүргүй үед Tesseract бүрэн үнэгүй танина (хэвлэмэл/цэвэр бичигт сайн). Гар бичмэлийг илүү сайн таниулахыг хүсвэл aistudio.google.com/apikey хаягаас Google акаунтаараа <b>үнэгүй</b> түлхүүр аваад энд оруулна — карт шаардахгүй.</p>
+          <summary>⚙️ AI тохиргоо</summary>
+          <label>Google Gemini API түлхүүр</label>
+          <input type="text" id="apiKey" placeholder="AIza..." oninput="updateMode()">
         </details>
       </div>
 
       <div class="card" id="formCard">
-        <h2>3. Хүлээн авагчид <span style="font-weight:400;color:var(--muted);font-size:12px">(нэг дор олныг оруулж болно)</span></h2>
+        <h2>3. Хүлээн авагчид</h2>
         <div id="recipList"></div>
         <button class="btn btn-secondary" onclick="addRecip()">＋ Хүлээн авагч нэмэх</button>
         <button class="btn btn-primary" onclick="saveReg()">✅ Бүх бүртгэлийг үүсгэх</button>
@@ -421,7 +419,6 @@
       <div class="card">
         <h2>Өнөөдрийн бүртгэлүүд</h2>
         <div id="regList"><p class="empty">Бүртгэл алга. «Ажилтан» хэсгээс нэмнэ үү.</p></div>
-        <p class="note">«Машинд тавьсан» товчийг дарж ачааг машинд ачсан эсэхийг тэмдэглэнэ.</p>
       </div>
     </section>
 
@@ -429,7 +426,6 @@
     <section id="tab-shopadm" style="display:none">
       <div class="card">
         <h2>🛍 Дэлгүүрийн бараа</h2>
-        <p class="note" style="margin-top:0">⭐ дарж Bestseller болгоно. Өөрчлөлт дэлгүүрт шууд харагдана.</p>
         <button class="btn btn-primary" onclick="openProdEdit(0)">＋ Шинэ бараа нэмэх</button>
         <button class="btn btn-secondary" onclick="openContentEdit()">🎨 Контент засах (баннер · ангилал · popup · хаяг)</button>
         <div id="prodAdmList" style="margin-top:12px"></div>
@@ -440,7 +436,6 @@
     <section id="tab-orders" style="display:none">
       <div class="card">
         <h2>🧾 Дэлгүүрийн захиалгууд</h2>
-        <p class="note" style="margin-top:0">Статус: Хүлээгдэж буй → Бэлтгэгдэж буй → Хүргэгдсэн. QPay-аар төлөгдсөнийг гараар өөрчлөх боломжгүй.</p>
         <div id="orderAdmList"></div>
       </div>
     </section>
@@ -473,12 +468,10 @@
     <section id="tab-admin" style="display:none">
       <div class="card">
         <h2>🔑 Админ нэвтрэх</h2>
-        <p class="note" style="margin-top:0">Зөвхөн админ «Ажилтан» болон «Бүртгэл» цэсийг харна.</p>
         <label>Нууц үг</label>
         <input type="text" id="adminPass" placeholder="Нууц үг" autocomplete="off">
         <button class="btn btn-primary" onclick="adminLogin()">Нэвтрэх</button>
         <div class="alert" id="adminErr"></div>
-        <p class="note">Демо нууц үг: <b>1234</b> (жинхэнэ хувилбарт сервер дээр шалгана)</p>
       </div>
     </section>
 
@@ -486,7 +479,6 @@
     <section id="tab-check" style="display:none">
       <div class="card">
         <h2>Хүргэлтээ шалгах</h2>
-        <p class="note" style="margin-top:0">Хүлээн авагч та утасныхаа дугаарыг оруулна уу.</p>
         <label>Утасны дугаар</label>
         <input type="tel" id="checkPhone" placeholder="9911XXXX">
         <button class="btn btn-primary" onclick="checkReg()">🔍 Шалгах</button>
@@ -908,7 +900,7 @@ function openCheckout(direct){
     <span class="close" onclick="closeOv('ovCheckout')">✕</span>
     <h3>📦 Захиалга</h3>
     <label>Нэр *</label><input id="coName">
-    <label>Утас (8 цифр) *</label><input id="coPhone" inputmode="numeric" maxlength="8"
+    <label>Утас *</label><input id="coPhone" inputmode="numeric" maxlength="8"
       oninput="this.value=this.value.replace(/\\D/g,'').slice(0,8)">
     <label>Хаяг *</label><input id="coAddr">
     <label>Хот *</label><input id="coCity" value="Улаанбаатар">
@@ -976,7 +968,7 @@ async function openQpay(order){
     <div class="banks" id="bankBtns"></div>`;
   openOv('ovQpay');
   if(SHOP_DEMO){
-    document.getElementById('qrBox').innerHTML = 'ДЕМО QR<br><br>Жинхэнэ горимд QPay-ийн жинхэнэ QR код энд гарна';
+    document.getElementById('qrBox').innerHTML = 'QR код';
     document.getElementById('bankBtns').innerHTML =
       ['Хаан банк','Голомт','Худалдаа хөгжил','Хас банк'].map(b=>
         `<button onclick="flashQpay()">${b}</button>`).join('');
@@ -1005,7 +997,7 @@ async function openQpay(order){
     }
   }
 }
-function flashQpay(){ document.getElementById('qpayStatus').textContent='Демо горимд банкны апп нээгдэхгүй — жинхэнэ горимд шууд нээгдэнэ.'; }
+function flashQpay(){ document.getElementById('qpayStatus').textContent='Банкны апп зөвхөн утсан дээр нээгдэнэ.'; }
 function closeQpay(){ if(qpayTimer) clearInterval(qpayTimer); closeOv('ovQpay'); }
 function showPaid(order){
   document.getElementById('shQpay').innerHTML = `
@@ -1090,7 +1082,7 @@ function openProdEdit(id){
     </div>
     <input type="file" id="peImgFile" accept="image/*" hidden onchange="onPeImg(this)">
     <img id="peImgPrev" class="pe-prev" style="display:${p.image?'':'none'}" src="${p.image||''}">
-    <label>Эмодзи (зураггүй үед харагдана)</label><input id="peE" value="${p.e||''}" maxlength="4">
+    <label>Эмодзи</label><input id="peE" value="${p.e||''}" maxlength="4">
     <label>Нэр *</label><input id="peName" value="${(p.name||'').replace(/"/g,'&quot;')}">
     <label>Ангилал</label><input id="peCat" value="${p.category||''}">
     <label>Брэнд</label><input id="peVendor" value="${p.vendor||''}">
@@ -1156,7 +1148,6 @@ function openContentEdit(){
     <h3>🎨 Контент засах</h3>
 
     <h3 style="font-size:14px;margin-top:8px">🖼 Үндсэн баннер</h3>
-    <p class="muted">Хоосон талбар эхний Bestseller-ээс автоматаар бөглөгдөнө.</p>
     <div style="display:flex;gap:8px;margin-top:6px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('bnImgFile').click()">📷 Зураг сонгох</button>
@@ -1166,7 +1157,7 @@ function openContentEdit(){
     <input type="file" id="bnImgFile" accept="image/*" hidden
       onchange="fileToVar(this,(d)=>{bnImage=d;updPrev('bnImgPrev',d)})">
     <img id="bnImgPrev" class="pe-prev" style="display:${bnImage?'':'none'}" src="${bnImage||''}">
-    <label>Баннерын бичлэг (байвал зургийг дарж тоглоно)</label>
+    <label>Баннерын бичлэг</label>
     <div style="display:flex;gap:8px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('bnVidFile').click()">🎬 Бичлэг сонгох</button>
@@ -1183,7 +1174,6 @@ function openContentEdit(){
     <label>Дэд бичвэр</label><input id="bnSub" value="${q(banner.subtitle)}">
 
     ${sep}<h3 style="font-size:14px">🏷 Ангилал бүрийн баннер</h3>
-    <p class="muted">Ангиллын эгнээний дээр харагдана.</p>
     ${cats.map((c,i)=>`
       <label>${c}</label>
       <div style="display:flex;gap:8px">
@@ -1196,7 +1186,7 @@ function openContentEdit(){
         onchange="fileToVar(this,(d)=>{ceCatBn['${q(c)}']=d;updPrev('cbP${i}',d)})">
       <img id="cbP${i}" class="pe-prev" style="display:${ceCatBn[c]?'':'none'}" src="${ceCatBn[c]||''}">`).join('')}
 
-    ${sep}<h3 style="font-size:14px">💬 Popup баннер (нээхэд гарч ирнэ)</h3>
+    ${sep}<h3 style="font-size:14px">💬 Popup баннер</h3>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" id="ppOn" style="width:auto" ${siteContent.popup.enabled?'checked':''}> Идэвхтэй
     </label>
@@ -1378,7 +1368,7 @@ async function runOCR(){
 // --- Tesseract.js: бүрэн үнэгүй, түлхүүргүй, browser дотроо танина ---
 async function tesseractOCR(){
   if(typeof Tesseract === 'undefined')
-    throw new Error('Tesseract ачаалагдсангүй — интернэт холболтоо шалгана уу');
+    throw new Error('Зураг таних сан ачаалагдсангүй.');
   const prog = document.getElementById('ocrProgress');
   prog.style.display='block';
   try{
@@ -1396,7 +1386,7 @@ async function tesseractOCR(){
     if(msg.includes('Worker') || msg.includes('blob') || msg.includes('CSP') || msg.includes('origin')){
       throw new Error('Claude-ийн урьдчилан харах цонх аюулгүй байдлын үүднээс OCR ажиллуулахыг хориглодог. ' +
         'Файлыг ТАТАЖ АВААД Chrome дээр нээвэл Tesseract бүрэн ажиллана. ' +
-        'Энэ цонхонд урсгалыг «📝 Демо өгөгдлөөр турших» товчоор туршиж болно.');
+        'Энэ цонхонд урсгалыг «📝 Жишээгээр бөглөх» товчоор туршиж болно.');
     }
     throw e;
   }
@@ -1417,7 +1407,7 @@ function renderRecips(){
         <b style="font-size:12.5px;color:var(--muted)">Хүлээн авагч ${i+1}</b>
         ${recips.length>1?`<button onclick="rmRecip(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">🗑</button>`:''}
       </div>
-      <label>Утас (8 цифр) *</label>
+      <label>Утас *</label>
       <input type="tel" value="${r.phone}" maxlength="8" inputmode="numeric" placeholder="9911XXXX"
         oninput="this.value=this.value.replace(/\\D/g,'').slice(0,8); recips[${i}].phone=this.value">
       <label>Хаяг</label>
