@@ -431,6 +431,30 @@
       </div>
     </section>
 
+    <!-- ================= ADMIN: ХЭРЭГЛЭГЧИД ================= -->
+    <section id="tab-users" style="display:none">
+      <div class="card">
+        <h2>👥 Шинэ хэрэглэгч бүртгэх</h2>
+        <label>И-мэйл</label>
+        <input type="text" id="nuEmail" placeholder="ajiltan@example.com" autocomplete="off">
+        <label>Нууц үг (6-аас дээш тэмдэгт)</label>
+        <input type="text" id="nuPass" placeholder="Нууц үг" autocomplete="off">
+        <label>Эрх</label>
+        <select id="nuRole" style="width:100%;padding:10px 12px;border:1px solid var(--line);
+          border-radius:10px;font-size:15px;color:var(--ink);background:#fbfcfe">
+          <option value="worker">Ажилтан — зөвхөн хүргэлт бүртгэх</option>
+          <option value="admin">Админ — бүх эрх</option>
+        </select>
+        <button class="btn btn-primary" onclick="createUser()">＋ Хэрэглэгч үүсгэх</button>
+        <div class="alert" id="nuErr"></div>
+        <div class="success-flash" id="nuOk"></div>
+      </div>
+      <div class="card">
+        <h2>Бүртгэлтэй хэрэглэгчид</h2>
+        <div id="userList"></div>
+      </div>
+    </section>
+
     <!-- ================= ADMIN: ЗАХИАЛГУУД ================= -->
     <section id="tab-orders" style="display:none">
       <div class="card">
@@ -503,10 +527,13 @@ let isAdmin = false;
 let currentTab = 'store';   // апп нээгдэхэд Дэлгүүрээс эхэлнэ
 const ADMIN_PASS = '1234'; // Демо. Жинхэнэ хувилбарт сервер дээр шалгана.
 
+let myRole = 'pending';   // 'admin' | 'worker' | 'pending'
 function tabDefs(){
-  return isAdmin
-    ? [['worker','📸','Ажилтан'],['list','📋','Хүргэлт'],['shopadm','🛍','Бараа'],['orders','🧾','Захиалга'],['logout','🚪','Гарах']]
-    : [['store','🛍','Дэлгүүр'],['check','🔍','Шалгах']];
+  if(!isAdmin) return [['store','🛍','Дэлгүүр'],['check','🔍','Шалгах']];
+  if(myRole === 'worker')
+    return [['worker','📸','Ажилтан'],['list','📋','Хүргэлт'],['logout','🚪','Гарах']];
+  return [['worker','📸','Ажилтан'],['list','📋','Хүргэлт'],['shopadm','🛍','Бараа'],
+          ['orders','🧾','Захиалга'],['users','👥','Хэрэглэгч'],['logout','🚪','Гарах']];
 }
 function renderTabs(){
   document.getElementById('tabbar').innerHTML = tabDefs().map(([k,ic,l])=>
@@ -521,15 +548,16 @@ function renderTabs(){
   if(k2) k2.style.display = isAdmin ? 'none' : '';
 }
 function showTab(name){
-  if(name==='logout'){ isAdmin=false; sbToken=null; name='store'; }
+  if(name==='logout'){ isAdmin=false; sbToken=null; myRole='pending'; name='store'; }
   currentTab = name;
-  ['worker','list','check','admin','store','shopadm','orders'].forEach(n=>{
+  ['worker','list','check','admin','store','shopadm','orders','users'].forEach(n=>{
     document.getElementById('tab-'+n).style.display = (n===name)?'':'none';
   });
   renderTabs();
   if(name==='list') renderList();
   if(name==='shopadm') renderShopAdm();
   if(name==='orders') renderOrders();
+  if(name==='users')  renderUsers();
 }
 // =====================================================================
 //  ДЭЛГҮҮР — Touch Me Slowly-тэй ижил функц (Netflix загвараар)
@@ -1426,6 +1454,13 @@ async function adminLogin(){
     const j = await r.json();
     if(!r.ok || !j.access_token) throw new Error(j.error_description || j.msg || 'Нэвтрэх амжилтгүй');
     sbToken = j.access_token;
+    try{ myRole = await sbRpc('my_role') || 'pending'; }catch(_){ myRole = 'pending'; }
+    if(myRole !== 'admin' && myRole !== 'worker'){
+      sbToken = null;
+      err.textContent = 'Танд эрх олгогдоогүй байна. Админд хандана уу.';
+      err.style.display = 'block';
+      return;
+    }
     isAdmin = true;
     document.getElementById('adminPass').value='';
     showTab('worker');
@@ -1683,6 +1718,76 @@ async function checkReg(){
       <div class="kv"><span class="k">Хүргэх хаяг</span><span class="v" style="max-width:60%">${esc(r.address)||'—'}</span></div>
       <div class="kv"><span class="k">Бүртгэсэн цаг</span><span class="v">${r.time}</span></div>
     </div>`;
+}
+
+// =====================================================================
+//  АДМИН: Хэрэглэгчийн удирдлага
+// =====================================================================
+const ROLE_LABEL = {admin:'Админ', worker:'Ажилтан', pending:'Эрхгүй'};
+
+async function renderUsers(){
+  const box = document.getElementById('userList');
+  let rows = [];
+  try{ rows = await sbGet('profiles?select=*&order=created_at'); }
+  catch(e){ box.innerHTML='<p class="empty">Хэрэглэгч татахад алдаа гарлаа.</p>'; return; }
+  if(!rows.length){ box.innerHTML='<p class="empty">Хэрэглэгч алга.</p>'; return; }
+  box.innerHTML = rows.map(u=>`
+    <div class="reg">
+      <div class="row">
+        <div style="min-width:0">
+          <div class="name" style="word-break:break-all">${esc(u.email)}</div>
+          <div class="meta">Эрх: <b>${ROLE_LABEL[u.role]||esc(u.role)}</b></div>
+        </div>
+        <select onchange="setRole('${u.id}', this.value)"
+          style="padding:7px 10px;border:1px solid var(--line);border-radius:10px;
+                 font-size:12px;font-weight:700;color:var(--ink);background:#f4f6fb">
+          <option value="admin"   ${u.role==='admin'  ?'selected':''}>Админ</option>
+          <option value="worker"  ${u.role==='worker' ?'selected':''}>Ажилтан</option>
+          <option value="pending" ${u.role==='pending'?'selected':''}>Эрхгүй</option>
+        </select>
+      </div>
+    </div>`).join('');
+}
+
+async function setRole(id, role){
+  try{
+    await sbSend('PATCH','profiles?id=eq.'+id, {role});
+    renderUsers();
+  }catch(e){ alert('Эрх өөрчлөхөд алдаа: '+e.message.slice(0,160)); }
+}
+
+async function createUser(){
+  const err  = document.getElementById('nuErr');
+  const ok   = document.getElementById('nuOk');
+  const mail = document.getElementById('nuEmail').value.trim();
+  const pass = document.getElementById('nuPass').value;
+  const role = document.getElementById('nuRole').value;
+  err.style.display='none'; ok.style.display='none';
+  if(!mail || !mail.includes('@')){ err.textContent='И-мэйл зөв оруулна уу.'; err.style.display='block'; return; }
+  if(pass.length < 6){ err.textContent='Нууц үг 6-аас дээш тэмдэгт байх ёстой.'; err.style.display='block'; return; }
+  try{
+    // Шинэ хэрэглэгч үүсгэнэ. Өөрийн нэвтрэлт (sbToken) хэвээр үлдэнэ.
+    const r = await fetch(SUPABASE_URL+'/auth/v1/signup',{
+      method:'POST',
+      headers:{apikey:SUPABASE_ANON_KEY,'content-type':'application/json'},
+      body: JSON.stringify({email:mail, password:pass})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.msg || j.error_description || j.message || 'Үүсгэж чадсангүй');
+    const uid = (j.user && j.user.id) || j.id;
+    if(uid){
+      // Trigger профайлыг үүсгэнэ — эрхийг нь тохируулна
+      try{ await sbSend('PATCH','profiles?id=eq.'+uid, {role, email:mail}); }catch(_){}
+    }
+    document.getElementById('nuEmail').value='';
+    document.getElementById('nuPass').value='';
+    ok.textContent = mail + ' — ' + (ROLE_LABEL[role]||role) + ' эрхээр үүслээ!';
+    ok.style.display='block';
+    setTimeout(()=>{ ok.style.display='none'; }, 4000);
+    renderUsers();
+  }catch(e){
+    err.textContent = 'Алдаа: ' + String(e.message).slice(0,180);
+    err.style.display='block';
+  }
 }
 
 // Эхлүүлэлт — бүх зарлалтын ДАРАА дуудна (TDZ алдаанаас сэргийлнэ)
