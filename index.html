@@ -1465,7 +1465,8 @@ async function adminLogin(){
     document.getElementById('adminPass').value='';
     showTab('worker');
   }catch(e){
-    err.textContent = 'И-мэйл эсвэл нууц үг буруу байна.';
+    // Жинхэнэ алдааг харуулна — оношлоход хэрэгтэй
+    err.textContent = 'Алдаа: ' + String(e.message||e).slice(0,220);
     err.style.display='block';
   }
 }
