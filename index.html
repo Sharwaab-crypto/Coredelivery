@@ -2,7 +2,7 @@
 <html lang="mn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoreDelivery</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
 <style>
@@ -13,6 +13,7 @@
   }
   *{box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif;}
   body{background:#D8E7E3; display:flex; justify-content:center; min-height:100vh; padding:16px 0;}
+  @media (max-width:520px){ body{padding:0;} .phone{max-width:100%; height:100dvh; border-radius:0; box-shadow:none;} }
   .phone{width:100%; max-width:420px; background:var(--bg); border-radius:24px; overflow:hidden;
     box-shadow:0 12px 40px rgba(20,30,60,.25); display:flex; flex-direction:column; height:94vh;
     position:relative;}
@@ -362,8 +363,6 @@
     .popup-card{max-width:400px;}
   }
 </style>
-</head>
-<body>
 <div class="phone">
   <!-- Компьютерын дээд навигац: лого · цэс · хайлт · сагс · түлхүүр (утсанд нуугдана) -->
   <header class="webbar">
@@ -468,8 +467,10 @@
     <section id="tab-admin" style="display:none">
       <div class="card">
         <h2>🔑 Админ нэвтрэх</h2>
+        <label>И-мэйл</label>
+        <input type="text" id="adminEmail" placeholder="admin@example.com" autocomplete="username">
         <label>Нууц үг</label>
-        <input type="text" id="adminPass" placeholder="Нууц үг" autocomplete="off">
+        <input type="password" id="adminPass" placeholder="Нууц үг" autocomplete="current-password">
         <button class="btn btn-primary" onclick="adminLogin()">Нэвтрэх</button>
         <div class="alert" id="adminErr"></div>
       </div>
@@ -520,7 +521,7 @@ function renderTabs(){
   if(k2) k2.style.display = isAdmin ? 'none' : '';
 }
 function showTab(name){
-  if(name==='logout'){ isAdmin=false; name='store'; }
+  if(name==='logout'){ isAdmin=false; sbToken=null; name='store'; }
   currentTab = name;
   ['worker','list','check','admin','store','shopadm','orders'].forEach(n=>{
     document.getElementById('tab-'+n).style.display = (n===name)?'':'none';
@@ -535,9 +536,69 @@ function showTab(name){
 //  Supabase холболт: доорх 2 утгыг бөглөвөл жинхэнэ өгөгдөлтэй ажиллана.
 //  Хоосон үед демо өгөгдлөөр бүрэн урсгалыг харуулна.
 // =====================================================================
-const SUPABASE_URL = '';        // ж: https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = '';   // anon (public) key — service_role-ийг ХЭЗЭЭ Ч БҮҮ ОРУУЛ
+const SUPABASE_URL = 'https://tmudzrtyzkciwloenbrh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWR6cnR5emtjaXdsb2VuYnJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MDUxODIsImV4cCI6MjEwNDI4MTE4Mn0.46rMrgZ3IrsielqPkC1AjZz7eWLYAJzEiJpzxFts5UQ';
 const SHOP_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
+
+// ---- Supabase туслах давхарга ----
+let sbToken = null;   // админ нэвтэрсний дараа JWT энд хадгалагдана
+function sbH(extra){
+  return Object.assign({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + (sbToken || SUPABASE_ANON_KEY),
+    'content-type': 'application/json'
+  }, extra||{});
+}
+async function sbGet(path){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + path, {headers: sbH()});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbSend(method, path, body, extraHeaders){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    method, headers: sbH(extraHeaders), body: body===undefined?undefined:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+async function sbRpc(fn, args){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+    method:'POST', headers: sbH(), body: JSON.stringify(args||{})});
+  if(!r.ok) throw new Error(await r.text());
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+// Зургийг багасгаад Storage-д байршуулж public URL буцаана
+async function sbUpload(dataUrl, folder){
+  if(!dataUrl) return '';
+  if(/^https?:/.test(dataUrl)) return dataUrl;   // аль хэдийн байршсан
+  let blob = await (await fetch(dataUrl)).blob();
+  if(blob.type.startsWith('image/')) blob = await shrinkImage(dataUrl);
+  const ext = (blob.type.split('/')[1]||'bin').split(';')[0];
+  const name = folder + '/' + Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/images/' + name, {
+    method:'POST',
+    headers:{apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+(sbToken||SUPABASE_ANON_KEY),
+             'content-type': blob.type || 'application/octet-stream'},
+    body: blob});
+  if(!r.ok) throw new Error('Зураг байршуулахад алдаа: ' + (await r.text()).slice(0,150));
+  return SUPABASE_URL + '/storage/v1/object/public/images/' + name;
+}
+function shrinkImage(dataUrl, max){
+  max = max || 1000;
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, max/Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(b=>b?res(b):rej(new Error('canvas')), 'image/jpeg', 0.82);
+    };
+    img.onerror = ()=>rej(new Error('Зураг уншиж чадсангүй'));
+    img.src = dataUrl;
+  });
+}
 
 // Демо бараанууд (products хүснэгтийн бүтэцтэй ижил талбарууд)
 const DEMO_PRODUCTS = [
@@ -592,13 +653,21 @@ const cardBg = (p)=> CARD_BG[p.id % CARD_BG.length];
 // --- Supabase-аас бараа татах (түлхүүр орсон үед) ---
 async function loadShop(){
   if(!SHOP_DEMO){
+    try{ shopProducts = await sbGet('products?select=*&order=id'); }
+    catch(e){ console.warn('Бараа татахад алдаа:', e.message); }
     try{
-      const res = await fetch(SUPABASE_URL+'/rest/v1/products?select=*&order=id',{
-        headers:{apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY}});
-      if(res.ok){ shopProducts = await res.json(); }
-    }catch(e){ /* холболт амжилтгүй бол демо өгөгдлөөр үргэлжилнэ */ }
+      const rows = await sbGet('site_content?select=data&id=eq.1');
+      const d = rows && rows[0] && rows[0].data;
+      if(d){
+        if(d.banner)     banner = Object.assign(banner, d.banner);
+        if(d.catBanners) siteContent.catBanners = d.catBanners;
+        if(d.popup)      siteContent.popup   = Object.assign(siteContent.popup, d.popup);
+        if(d.contact && d.contact.address) siteContent.contact = d.contact;
+      }
+    }catch(e){ console.warn('Контент татахад алдаа:', e.message); }
   }
   renderShop();
+  maybePopup();
 }
 
 let favs = new Set(); // хадгалсан бараанууд (♡)
@@ -933,7 +1002,7 @@ async function submitOrder(){
   const items = src.map(c=>{const p=prod(c.id); return {product_id:p.id, name:p.name, qty:c.qty, price:unit(p)};});
   const total = items.reduce((s,i)=>s+i.price*i.qty,0);
   const order = {
-    id:'TMS'+String(Math.floor(10000+Math.random()*90000)),
+    id:'CD'+String(Math.floor(10000+Math.random()*90000)),
     date:new Date().toISOString().slice(0,10),
     items, total, customer:name, phone, address:addr, city,
     pay:payMethod, status:'Хүлээгдэж буй',
@@ -1058,13 +1127,22 @@ function renderShopAdm(){
       <button onclick="delProd(${p.id})">🗑</button>
     </div>`).join('') || '<p class="empty">Бараа алга.</p>';
 }
-function toggleBest(id){
-  const p = prod(id); if(p){ p.best_seller = !p.best_seller; renderShopAdm(); renderShop(); }
+async function toggleBest(id){
+  const p = prod(id); if(!p) return;
+  const v = !p.best_seller;
+  try{
+    await sbSend('PATCH', 'products?id=eq.'+id, {best_seller:v});
+    p.best_seller = v; renderShopAdm(); renderShop();
+  }catch(e){ alert('Хадгалахад алдаа: '+e.message); }
 }
-function delProd(id){
-  shopProducts = shopProducts.filter(p=>p.id!==id);
-  cart = cart.filter(c=>c.id!==id); updateCartBadge();
-  renderShopAdm(); renderShop();
+async function delProd(id){
+  if(!confirm('Энэ барааг устгах уу?')) return;
+  try{
+    await sbSend('DELETE', 'products?id=eq.'+id);
+    shopProducts = shopProducts.filter(p=>p.id!==id);
+    cart = cart.filter(c=>c.id!==id); updateCartBadge();
+    renderShopAdm(); renderShop();
+  }catch(e){ alert('Устгахад алдаа: '+e.message); }
 }
 function openProdEdit(id){
   editPid = id;
@@ -1099,7 +1177,7 @@ function openProdEdit(id){
     <button class="nf-btn" onclick="saveProd()">💾 Хадгалах</button>`;
   openOv('ovProdEdit');
 }
-function saveProd(){
+async function saveProd(){
   const name = document.getElementById('peName').value.trim();
   const price = parseInt(document.getElementById('pePrice').value||'0',10);
   const err = document.getElementById('peErr');
@@ -1116,15 +1194,25 @@ function saveProd(){
     usage:document.getElementById('peUsage').value.trim(),
     caution:document.getElementById('peCaution').value.trim(),
   };
-  if(editPid){
-    Object.assign(prod(editPid), vals);
-  }else{
-    const nid = Math.max(0, ...shopProducts.map(p=>p.id)) + 1;
-    shopProducts.push({id:nid, best_seller:false, rating:0, ...vals});
+  try{
+    err.textContent='Хадгалж байна...'; err.style.display='block';
+    vals.image = await sbUpload(vals.image, 'products');
+    if(editPid){
+      const rows = await sbSend('PATCH', 'products?id=eq.'+editPid, vals, {Prefer:'return=representation'});
+      Object.assign(prod(editPid), rows && rows[0] ? rows[0] : vals);
+    }else{
+      const rows = await sbSend('POST', 'products',
+        Object.assign({best_seller:false, rating:0}, vals), {Prefer:'return=representation'});
+      if(rows && rows[0]) shopProducts.push(rows[0]);
+    }
+    err.style.display='none';
+    closeOv('ovProdEdit');
+    renderShopAdm(); renderShop();
+    flash('✓ Бараа хадгалагдлаа');
+  }catch(e){
+    err.textContent = 'Хадгалахад алдаа: ' + e.message.slice(0,160);
+    err.style.display='block';
   }
-  closeOv('ovProdEdit');
-  renderShopAdm(); renderShop();
-  flash('✓ Бараа хадгалагдлаа');
 }
 
 // ---- Контент засах (админ): баннер + ангиллын баннерууд + popup + хаяг ----
@@ -1223,7 +1311,13 @@ function updVidStatus(){
   if(st) st.textContent = bnVideo ? '🎬 Бичлэг орсон ✓' : 'Бичлэг сонгоогүй';
   if(v){ v.src = bnVideo||''; v.style.display = bnVideo?'':'none'; }
 }
-function saveContent(){
+async function saveContent(){
+  try{
+    bnImage  = await sbUpload(bnImage,  'banner');
+    bnVideo  = await sbUpload(bnVideo,  'banner');
+    cePopImg = await sbUpload(cePopImg, 'popup');
+    for(const k of Object.keys(ceCatBn)) ceCatBn[k] = await sbUpload(ceCatBn[k], 'cats');
+  }catch(e){ alert('Файл байршуулахад алдаа: '+e.message); return; }
   banner = {
     image: bnImage,
     video: bnVideo,
@@ -1245,12 +1339,18 @@ function saveContent(){
     email: document.getElementById('ctEmail').value.trim(),
     hours: document.getElementById('ctHours').value.trim(),
   };
+  try{
+    await sbSend('POST', 'site_content',
+      {id:1, data:{banner, catBanners:siteContent.catBanners,
+                   popup:siteContent.popup, contact:siteContent.contact}},
+      {Prefer:'resolution=merge-duplicates'});
+  }catch(e){ alert('Контент хадгалахад алдаа: '+e.message); return; }
   closeOv('ovBannerEdit');
   renderShop();
   flash('✓ Контент хадгалагдлаа');
 }
-function previewPopup(){
-  saveContent();
+async function previewPopup(){
+  await saveContent();
   popupShown = false;
   maybePopup();
 }
@@ -1274,10 +1374,13 @@ function payBadge(o){
     ? '<span class="obadge ob-paid">Бэлэн · Төлөгдсөн</span>'
     : '<span class="obadge ob-cash">Бэлнээр (хүргэх үед)</span>';
 }
-function renderOrders(){
+let shopOrders = [];
+async function renderOrders(){
   const box = document.getElementById('orderAdmList');
-  if(!demoOrders.length){ box.innerHTML='<p class="empty">Захиалга алга.</p>'; return; }
-  box.innerHTML = demoOrders.slice().reverse().map(o=>`
+  try{ shopOrders = await sbGet('orders?select=*&order=created_at.desc'); }
+  catch(e){ box.innerHTML='<p class="empty">Захиалга татахад алдаа гарлаа.</p>'; return; }
+  if(!shopOrders.length){ box.innerHTML='<p class="empty">Захиалга алга.</p>'; return; }
+  box.innerHTML = shopOrders.map(o=>`
     <div class="reg">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:13.5px">${o.id} · ${o.customer}</b>
@@ -1295,26 +1398,39 @@ function renderOrders(){
       </div>
     </div>`).join('');
 }
-function toggleEntered(id){
-  const o = demoOrders.find(x=>x.id===id);
-  if(o){ o.entered=!o.entered; renderOrders(); }
+async function toggleEntered(id){
+  const o = shopOrders.find(x=>x.id===id); if(!o) return;
+  try{ await sbSend('PATCH','orders?id=eq.'+encodeURIComponent(id), {entered:!o.entered}); renderOrders(); }
+  catch(e){ alert('Хадгалахад алдаа: '+e.message); }
 }
-function advStatus(id){
-  const o = demoOrders.find(x=>x.id===id); if(!o) return;
+async function advStatus(id){
+  const o = shopOrders.find(x=>x.id===id); if(!o) return;
   const i = ORDER_FLOW.indexOf(o.status);
-  if(i<ORDER_FLOW.length-1){ o.status = ORDER_FLOW[i+1]; renderOrders(); }
+  if(i>=ORDER_FLOW.length-1) return;
+  try{ await sbSend('PATCH','orders?id=eq.'+encodeURIComponent(id), {status:ORDER_FLOW[i+1]}); renderOrders(); }
+  catch(e){ alert('Хадгалахад алдаа: '+e.message); }
 }
 
 loadShop();
-function adminLogin(){
-  const err = document.getElementById('adminErr');
-  if(document.getElementById('adminPass').value === ADMIN_PASS){
+async function adminLogin(){
+  const err   = document.getElementById('adminErr');
+  const email = document.getElementById('adminEmail').value.trim();
+  const pass  = document.getElementById('adminPass').value;
+  err.style.display='none';
+  if(!email || !pass){ err.textContent='И-мэйл болон нууц үгээ оруулна уу.'; err.style.display='block'; return; }
+  try{
+    const r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST',
+      headers:{apikey:SUPABASE_ANON_KEY,'content-type':'application/json'},
+      body: JSON.stringify({email, password:pass})});
+    const j = await r.json();
+    if(!r.ok || !j.access_token) throw new Error(j.error_description || j.msg || 'Нэвтрэх амжилтгүй');
+    sbToken = j.access_token;
     isAdmin = true;
     document.getElementById('adminPass').value='';
-    err.style.display='none';
     showTab('worker');
-  }else{
-    err.textContent='Нууц үг буруу байна.';
+  }catch(e){
+    err.textContent = 'И-мэйл эсвэл нууц үг буруу байна.';
     err.style.display='block';
   }
 }
@@ -1472,7 +1588,7 @@ async function geminiOCR(key){
 
 // ======== Save ========
 let regSeq = 0;
-function saveReg(){
+async function saveReg(){
   const dPhone = document.getElementById('drvPhone').value.trim();
   const dPlate = document.getElementById('drvPlate').value.trim().toUpperCase();
   if(!dPhone || !dPlate){ alertTab('Жолоочийн утас болон машины дугаарыг оруулна уу.'); return; }
@@ -1481,15 +1597,16 @@ function saveReg(){
   for(const r of filled){
     if(r.phone.length!==8){ alertTab('Хүлээн авагч бүрийн утас яг 8 цифр байх ёстой.'); return; }
   }
-  const time = new Date().toLocaleTimeString('mn-MN',{hour:'2-digit',minute:'2-digit'});
-  filled.forEach(r=>{
-    regs.unshift({
-      id: ++regSeq, time,
-      driverPhone:dPhone, plate:dPlate,
+  let photoUrl = '';
+  try{ photoUrl = await sbUpload(photoDataUrl, 'deliveries'); }catch(e){ /* зураг заавал биш */ }
+  try{
+    await sbSend('POST', 'deliveries', filled.map(r=>({
+      driver_phone:dPhone, plate:dPlate,
       phone:r.phone, address:r.addr.trim(),
-      loaded:false, photo:photoDataUrl
-    });
-  });
+      loaded:false, photo_url:photoUrl
+    })));
+  }catch(e){ alertTab('Хадгалахад алдаа: '+e.message.slice(0,160)); return; }
+  await loadRegs();
   const ok = document.getElementById('saveOk');
   ok.textContent = filled.length + ' бүртгэл амжилттай үүслээ!';
   ok.style.display='block';
@@ -1509,15 +1626,25 @@ function alertTab(msg){
 }
 
 // ======== List ========
-function renderList(){
+async function loadRegs(){
+  try{ regs = await sbGet('deliveries?select=*&order=created_at.desc&limit=200'); }
+  catch(e){ regs = []; }
+}
+function regTime(r){
+  const d = new Date(r.created_at);
+  const p2 = n=>String(n).padStart(2,'0');
+  return p2(d.getMonth()+1)+'.'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
+async function renderList(){
   const box = document.getElementById('regList');
+  await loadRegs();
   if(!regs.length){ box.innerHTML='<p class="empty">Бүртгэл алга. «Ажилтан» хэсгээс нэмнэ үү.</p>'; return; }
   box.innerHTML = regs.map(r=>`
     <div class="reg">
       <div class="row">
         <div>
           <div class="name">📱 ${esc(r.phone)}</div>
-          <div class="meta">📍 ${esc(r.address)||'—'}<br>🚗 <span class="plate">${esc(r.plate)}</span> · ☎ ${esc(r.driverPhone)} · 🕐 ${r.time}</div>
+          <div class="meta">📍 ${esc(r.address)||'—'}<br>🚗 <span class="plate">${esc(r.plate)}</span> · ☎ ${esc(r.driver_phone)} · 🕐 ${regTime(r)}</div>
         </div>
         <button class="toggle-btn ${r.loaded?'on':''}" onclick="toggleLoaded(${r.id})">
           ${r.loaded?'✅ Машинд тавьсан':'⬜ Машинд тавих'}
@@ -1525,21 +1652,27 @@ function renderList(){
       </div>
     </div>`).join('');
 }
-function toggleLoaded(id){
-  const r = regs.find(x=>x.id===id);
-  if(r){ r.loaded=!r.loaded; renderList(); }
+async function toggleLoaded(id){
+  const r = regs.find(x=>x.id===id); if(!r) return;
+  try{ await sbSend('PATCH','deliveries?id=eq.'+id, {loaded:!r.loaded}); renderList(); }
+  catch(e){ alert('Хадгалахад алдаа: '+e.message); }
 }
 function esc(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // ======== Check ========
-function checkReg(){
+async function checkReg(){
   const phone = document.getElementById('checkPhone').value.replace(/\D/g,'');
   const err = document.getElementById('checkErr');
   const box = document.getElementById('checkResult');
   err.style.display='none'; box.innerHTML='';
   if(phone.length<6){ err.textContent='Утасны дугаараа бүрэн оруулна уу.'; err.style.display='block'; return; }
-  const r = regs.find(x=>x.phone===phone);
-  if(!r){ err.textContent='Энэ дугаараар бүртгэл олдсонгүй.'; err.style.display='block'; return; }
+  let rows = [];
+  try{ rows = await sbRpc('check_delivery', {p_phone:phone}) || []; }
+  catch(e){ err.textContent='Шалгахад алдаа гарлаа.'; err.style.display='block'; return; }
+  if(!rows.length){ err.textContent='Энэ дугаараар бүртгэл олдсонгүй.'; err.style.display='block'; return; }
+  const r = rows[0];
+  r.driverPhone = r.driver_phone;
+  r.time = regTime(r);
   box.innerHTML = `
     <div class="card" style="margin-top:12px; margin-bottom:0; background:#16383A">
       <div class="kv"><span class="k">Статус</span><span class="v">
@@ -1554,7 +1687,6 @@ function checkReg(){
 
 // Эхлүүлэлт — бүх зарлалтын ДАРАА дуудна (TDZ алдаанаас сэргийлнэ)
 renderRecips();
-maybePopup(); // Дэлгүүр нээгдэхэд popup баннер (идэвхтэй үед)
 </script>
 </body>
 </html>
