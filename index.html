@@ -426,7 +426,8 @@
       <div class="card">
         <h2>🛍 Дэлгүүрийн бараа</h2>
         <button class="btn btn-primary" onclick="openProdEdit(0)">＋ Шинэ бараа нэмэх</button>
-        <button class="btn btn-secondary" onclick="openContentEdit()">🎨 Контент засах (баннер · ангилал · popup · хаяг)</button>
+        <button class="btn btn-secondary" onclick="openCatEdit()">🏷 Ангилал удирдах</button>
+        <button class="btn btn-secondary" onclick="openContentEdit()">🎨 Контент засах (баннер · зураг · popup · хаяг)</button>
         <div id="prodAdmList" style="margin-top:12px"></div>
       </div>
     </section>
@@ -485,6 +486,7 @@
     <div class="ov" id="ovQpay"><div class="sheet" id="shQpay"></div></div>
     <div class="ov" id="ovProdEdit"><div class="sheet" id="shProdEdit"></div></div>
     <div class="ov" id="ovBannerEdit"><div class="sheet" id="shBannerEdit"></div></div>
+    <div class="ov" id="ovCatEdit"><div class="sheet" id="shCatEdit"></div></div>
     <div class="ov center" id="ovPopup"><div class="popup-card" id="shPopup"></div></div>
 
     <!-- ================= ADMIN LOGIN TAB ================= -->
@@ -654,6 +656,7 @@ const DEMO_PRODUCTS = [
 const CARD_BG = ['#0F4F4A','#156A62','#0C3B3D','#1A7A6E','#123F4A','#0E5A50','#17877A','#0F3335'];
 
 let shopProducts = DEMO_PRODUCTS.slice();
+let shopCats = [];        // [{id, name, sort}] — админаас удирддаг ангиллууд
 let cart = [];            // [{id, qty}]
 let dQty = 1;             // дэлгэрэнгүй дэх тоо ширхэг
 let curPid = null;
@@ -683,6 +686,8 @@ async function loadShop(){
   if(!SHOP_DEMO){
     try{ shopProducts = await sbGet('products?select=*&order=id'); }
     catch(e){ console.warn('Бараа татахад алдаа:', e.message); }
+    try{ shopCats = await sbGet('categories?select=*&order=sort,name'); }
+    catch(e){ console.warn('Ангилал татахад алдаа:', e.message); }
     try{
       const rows = await sbGet('site_content?select=data&id=eq.1');
       const d = rows && rows[0] && rows[0].data;
@@ -784,6 +789,11 @@ function maybePopup(){
     </div>`;
   openOv('ovPopup');
 }
+function catNames(){
+  const fromDb = shopCats.map(c=>c.name);
+  const fromProd = [...new Set(shopProducts.map(p=>p.category).filter(Boolean))];
+  return fromDb.length ? [...new Set([...fromDb, ...fromProd])] : fromProd;
+}
 function catEmoji(c){
   const p = shopProducts.find(x=>x.category===c && x.e);
   return (p && p.e) || '';
@@ -853,7 +863,7 @@ function renderShop(){
   renderHero();
   const box = document.getElementById('storeRows');
   if(q){
-    const found = shopProducts.filter(p=>(p.name+' '+(p.vendor||'')+' '+(p.category||'')).toLowerCase().includes(q));
+    const found = shopProducts.filter(p=>(p.name+' '+(p.sku||'')+' '+(p.category||'')).toLowerCase().includes(q));
     box.innerHTML = (found.length
       ? rowHtml('🔎 Хайлтын үр дүн ('+found.length+')', found, false, true)
       : '<p style="color:#888;text-align:center;padding:24px 16px;font-size:13px">Илэрц олдсонгүй.</p>')
@@ -862,7 +872,7 @@ function renderShop(){
   }
   const best = shopProducts.filter(p=>p.best_seller);
   const sale = shopProducts.filter(p=>p.discount>0);
-  const cats = [...new Set(shopProducts.map(p=>p.category).filter(Boolean))];
+  const cats = catNames();
   // Баннерын яг доор — ангиллын товчнууд
   const chips = `<div class="cat-chips">
     <div class="cat-chip ${!catFilter?'sel':''}" onclick="setCat('')">Бүгд</div>
@@ -889,7 +899,7 @@ function openDetail(id){
         ? `<div style="text-align:center;font-size:76px;padding:6px 0">${p.e}</div>`
         : `<div class="noimg lg">Зураг оруулаагүй</div>`)}
     <h3>${p.name}</h3>
-    <div class="muted">${p.vendor||''} · ⭐ ${p.rating||'-'} · Үлдэгдэл: ${p.stock??'-'}</div>
+    <div class="muted">${p.category||''}${p.sku?' · '+p.sku:''} · ⭐ ${p.rating||'-'} · Үлдэгдэл: ${p.stock??'-'}</div>
     <div style="margin:10px 0">
       ${p.discount?`<span class="old-price">${fmt(p.price)}</span>`:''}
       <span class="new-price">${fmt(u)}</span>
@@ -1148,7 +1158,7 @@ function renderShopAdm(){
       ${p.image?`<img class="thumb" src="${p.image}" alt="">`:(p.e?`<span class="em3">${p.e}</span>`:'<div class="noimg sm light"></div>')}
       <div class="pi">
         <div class="pn">${p.name}</div>
-        <div class="pm">${p.category||'—'} · ${fmt(p.price)}${p.discount?' · −'+p.discount+'%':''} · Үлд: ${p.stock??'-'}</div>
+        <div class="pm">${p.sku?'<b>'+esc(p.sku)+'</b> · ':''}${p.category||'—'} · ${fmt(p.price)}${p.discount?' · −'+p.discount+'%':''} · Үлд: ${p.stock??'-'}</div>
       </div>
       <button class="star ${p.best_seller?'on':'off'}" title="Bestseller" onclick="toggleBest(${p.id})">⭐</button>
       <button onclick="openProdEdit(${p.id})">✏️</button>
@@ -1174,7 +1184,7 @@ async function delProd(id){
 }
 function openProdEdit(id){
   editPid = id;
-  const p = id ? prod(id) : {e:'🛍', name:'', category:'', vendor:'', price:0, discount:0, stock:0,
+  const p = id ? prod(id) : {e:'', name:'', sku:'', category:'', price:0, discount:0, stock:0,
     best_seller:false, description:'', usage:'', caution:'', image:''};
   peImage = p.image || '';
   document.getElementById('shProdEdit').innerHTML = `
@@ -1188,10 +1198,14 @@ function openProdEdit(id){
     </div>
     <input type="file" id="peImgFile" accept="image/*" hidden onchange="onPeImg(this)">
     <img id="peImgPrev" class="pe-prev" style="display:${p.image?'':'none'}" src="${p.image||''}">
-    <label>Эмодзи</label><input id="peE" value="${p.e||''}" maxlength="4">
     <label>Нэр *</label><input id="peName" value="${(p.name||'').replace(/"/g,'&quot;')}">
-    <label>Ангилал</label><input id="peCat" value="${p.category||''}">
-    <label>Брэнд</label><input id="peVendor" value="${p.vendor||''}">
+    <label>SKU / Дотоодын код</label><input id="peSku" value="${(p.sku||'').replace(/"/g,'&quot;')}" placeholder="ж: CD-0001">
+    <label>Ангилал</label>
+    <select id="peCat" style="width:100%;background:#1B4244;border:1px solid #2A5658;
+      border-radius:8px;padding:10px;color:#fff;font-size:14px;margin-top:4px">
+      <option value="">— сонгоно уу —</option>
+      ${catNames().map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===p.category?'selected':''}>${c}</option>`).join('')}
+    </select>
     <label>Үнэ (₮) *</label><input id="pePrice" inputmode="numeric" value="${p.price||0}"
       oninput="this.value=this.value.replace(/\\D/g,'')">
     <label>Хямдрал (%)</label><input id="peDisc" inputmode="numeric" value="${p.discount||0}"
@@ -1212,10 +1226,9 @@ async function saveProd(){
   if(!name || !price){ err.textContent='Нэр болон үнийг оруулна уу.'; err.style.display='block'; return; }
   const disc = Math.min(100, parseInt(document.getElementById('peDisc').value||'0',10));
   const vals = {
-    image:peImage,
-    e:document.getElementById('peE').value||'🛍', name,
-    category:document.getElementById('peCat').value.trim(),
-    vendor:document.getElementById('peVendor').value.trim(),
+    image:peImage, name,
+    sku:document.getElementById('peSku').value.trim(),
+    category:document.getElementById('peCat').value,
     price, discount:disc,
     stock:parseInt(document.getElementById('peStock').value||'0',10),
     description:document.getElementById('peDesc').value.trim(),
@@ -1256,7 +1269,7 @@ function openContentEdit(){
   bnVideo = banner.video || '';
   ceCatBn = {...siteContent.catBanners};
   cePopImg = siteContent.popup.image || '';
-  const cats = [...new Set(shopProducts.map(p=>p.category).filter(Boolean))];
+  const cats = catNames();
   const q = (s)=>(s||'').replace(/"/g,'&quot;');
   const sep = `<div style="border-top:1px solid #333;margin:18px 0 6px"></div>`;
   document.getElementById('shBannerEdit').innerHTML = `
@@ -1719,6 +1732,59 @@ async function checkReg(){
       <div class="kv"><span class="k">Хүргэх хаяг</span><span class="v" style="max-width:60%">${esc(r.address)||'—'}</span></div>
       <div class="kv"><span class="k">Бүртгэсэн цаг</span><span class="v">${r.time}</span></div>
     </div>`;
+}
+
+// =====================================================================
+//  АДМИН: Ангиллын удирдлага
+// =====================================================================
+function openCatEdit(){ renderCatEdit(); openOv('ovCatEdit'); }
+function renderCatEdit(){
+  const used = {};
+  shopProducts.forEach(p=>{ if(p.category) used[p.category] = (used[p.category]||0)+1; });
+  document.getElementById('shCatEdit').innerHTML = `
+    <span class="close" onclick="closeOv('ovCatEdit')">✕</span>
+    <h3>🏷 Ангилал удирдах</h3>
+    <label>Шинэ ангиллын нэр</label>
+    <input id="newCatName" placeholder="ж: Хүнс" onkeydown="if(event.key==='Enter')addCat()">
+    <button class="nf-btn" onclick="addCat()">＋ Ангилал нэмэх</button>
+    <div class="alert" id="catErr" style="margin-top:10px"></div>
+    <div style="margin-top:16px">
+      ${catNames().length ? catNames().map(c=>`
+        <div class="cart-line">
+          <div style="flex:1"><b>${esc(c)}</b><br>
+            <span class="muted">${used[c]||0} бараа</span></div>
+          <button class="rm" onclick="delCat('${esc(c).replace(/'/g,"&#39;")}')">🗑</button>
+        </div>`).join('') : '<p class="muted" style="text-align:center;padding:16px 0">Ангилал алга.</p>'}
+    </div>`;
+}
+async function addCat(){
+  const inp = document.getElementById('newCatName');
+  const err = document.getElementById('catErr');
+  const name = inp.value.trim();
+  err.style.display='none';
+  if(!name){ err.textContent='Ангиллын нэрээ оруулна уу.'; err.style.display='block'; return; }
+  if(catNames().includes(name)){ err.textContent='Ийм ангилал аль хэдийн байна.'; err.style.display='block'; return; }
+  try{
+    const rows = await sbSend('POST','categories',{name}, {Prefer:'return=representation'});
+    if(rows && rows[0]) shopCats.push(rows[0]);
+    inp.value='';
+    renderCatEdit(); renderShop();
+    flash('✓ Ангилал нэмэгдлээ');
+  }catch(e){ err.textContent='Алдаа: '+e.message.slice(0,160); err.style.display='block'; }
+}
+async function delCat(name){
+  const n = shopProducts.filter(p=>p.category===name).length;
+  if(!confirm('«'+name+'» ангиллыг устгах уу?' + (n ? '\n\nЭнэ ангилалд '+n+' бараа байна — тэдгээр нь ангилалгүй болно.' : ''))) return;
+  try{
+    const row = shopCats.find(c=>c.name===name);
+    if(row) await sbSend('DELETE','categories?id=eq.'+row.id);
+    if(n) await sbSend('PATCH','products?category=eq.'+encodeURIComponent(name), {category:null});
+    shopCats = shopCats.filter(c=>c.name!==name);
+    shopProducts.forEach(p=>{ if(p.category===name) p.category=null; });
+    if(catFilter===name) catFilter='';
+    renderCatEdit(); renderShopAdm(); renderShop();
+    flash('✓ Ангилал устлаа');
+  }catch(e){ alert('Устгахад алдаа: '+e.message.slice(0,160)); }
 }
 
 // =====================================================================
