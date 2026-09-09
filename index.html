@@ -44,6 +44,21 @@
   .foot-grid > div{flex:1; min-width:200px;}
   .foot-img{width:100%; max-width:320px; border-radius:12px; object-fit:cover;
     border:1px solid #1E4749;}
+  .branches{display:flex; flex-wrap:wrap; gap:14px; margin-top:14px;}
+  .branch{flex:1 1 240px; min-width:220px; background:#123032; border:1px solid #1E4749;
+    border-radius:14px; padding:14px; line-height:1.9;}
+  .branch img{width:100%; height:130px; object-fit:cover; border-radius:10px;
+    margin-bottom:10px; display:block;}
+  .branch .bname{color:#fff; font-weight:800; font-size:14px; line-height:1.4; margin-bottom:4px;}
+  .map-btn{display:inline-block; margin-top:8px; background:#1B4244; border:1px solid #2A5658;
+    color:#8FE3D2; border-radius:99px; padding:7px 14px; font-size:12px; font-weight:700;
+    text-decoration:none;}
+  .map-btn:hover{background:#235052;}
+  .br-edit{border:1px solid #2A5658; border-radius:12px; padding:12px; margin-top:10px;
+    background:#0F2A2C;}
+  .br-edit .brh{display:flex; justify-content:space-between; align-items:center;}
+  .br-edit .brh b{color:#8FE3D2; font-size:12.5px;}
+  .br-edit .brh button{background:none; border:none; color:#ff8b8b; cursor:pointer; font-size:15px;}
   /* «Шалгах» хэсэг — дэлгүүртэй ижил хар загвар */
   #tab-check{background:#0C2224; min-height:100%;}
   #tab-check .card{background:#123032; border-color:#1E4749;}
@@ -706,6 +721,7 @@ async function loadShop(){
         if(d.catBanners) siteContent.catBanners = d.catBanners;
         if(d.popup)      siteContent.popup   = Object.assign(siteContent.popup, d.popup);
         if(d.contact && d.contact.address) siteContent.contact = d.contact;
+        if(Array.isArray(d.branches)) siteContent.branches = d.branches;
       }
     }catch(e){ console.warn('Контент татахад алдаа:', e.message); }
   }
@@ -783,6 +799,7 @@ let siteContent = {
     text:'Шинэ хэрэглэгчдэд эхний захиалгад 10% хямдрал. Хүргэлт үргэлж үнэгүй!',
     btn:'Дэлгүүр үзэх' },
   contact: { image:'', ...SHOP_INFO },
+  branches: [],
 };
 let popupShown = false;
 function maybePopup(){
@@ -808,18 +825,30 @@ function catEmoji(c){
   const p = shopProducts.find(x=>x.category===c && x.e);
   return (p && p.e) || '';
 }
+// Салбарууд — хуучин ганц хаягтай тохиргоог автоматаар нэг салбар болгоно
+function branchList(){
+  if(siteContent.branches && siteContent.branches.length) return siteContent.branches;
+  const c = siteContent.contact || {};
+  if(c.address || c.phone || c.image)
+    return [{name:'', address:c.address||'', phone:c.phone||'', hours:c.hours||'',
+             map:'', image:c.image||''}];
+  return [];
+}
 function footerHtml(){
   const ct = siteContent.contact;
+  const brs = branchList();
   return `<div class="nf-footer">
-    <div class="foot-grid">
-      <div>
-        <b>Холбоо барих</b><br>
-        📍 ${ct.address}<br>
-        ☎ ${ct.phone}<br>
-        ✉ ${ct.email}<br>
-        🕐 ${ct.hours}
-      </div>
-      ${ct.image?`<img class="foot-img" src="${ct.image}" alt="">`:''}
+    <b>Холбоо барих</b>${ct.email?` &nbsp;·&nbsp; ✉ ${esc(ct.email)}`:''}
+    <div class="branches">
+      ${brs.map(b=>`
+        <div class="branch">
+          ${b.image?`<img src="${b.image}" alt="">`:''}
+          ${b.name?`<div class="bname">${esc(b.name)}</div>`:''}
+          ${b.address?`📍 ${esc(b.address)}<br>`:''}
+          ${b.phone?`☎ ${esc(b.phone)}<br>`:''}
+          ${b.hours?`🕐 ${esc(b.hours)}`:''}
+          ${b.map?`<br><a class="map-btn" href="${esc(b.map)}" target="_blank" rel="noopener">🗺 Газрын зураг дээр харах</a>`:''}
+        </div>`).join('')}
     </div>
   </div>`;
 }
@@ -1272,7 +1301,7 @@ async function saveProd(){
 }
 
 // ---- Контент засах (админ): баннер + ангиллын баннерууд + popup + хаяг ----
-let bnImage = '', bnVideo = '', ceCatBn = {}, cePopImg = '', ceContactImg = '';
+let bnImage = '', bnVideo = '', ceCatBn = {}, cePopImg = '';
 function fileToVar(input, cb){
   const f = input.files && input.files[0]; if(!f) return;
   const rd = new FileReader();
@@ -1284,7 +1313,6 @@ function openContentEdit(){
   bnVideo = banner.video || '';
   ceCatBn = {...siteContent.catBanners};
   cePopImg = siteContent.popup.image || '';
-  ceContactImg = siteContent.contact.image || '';
   const cats = catNames();
   const q = (s)=>(s||'').replace(/"/g,'&quot;');
   const sep = `<div style="border-top:1px solid #333;margin:18px 0 6px"></div>`;
@@ -1348,25 +1376,57 @@ function openContentEdit(){
     <label>Текст</label><input id="ppText" value="${q(siteContent.popup.text)}">
     <label>Товчны бичиг</label><input id="ppBtn" value="${q(siteContent.popup.btn)}">
 
-    ${sep}<h3 style="font-size:14px">📍 Хаяг, холбоо барих</h3>
-    <label>Зураг (байршлын зураг, дэлгүүрийн гэрэл зураг г.м.)</label>
-    <div style="display:flex;gap:8px">
-      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
-        onclick="document.getElementById('ctImgFile').click()">📷 Зураг сонгох</button>
-      <button class="nf-btn" style="margin:0;background:#235052"
-        onclick="ceContactImg='';updPrev('ctImgPrev','')">🗑</button>
-    </div>
-    <input type="file" id="ctImgFile" accept="image/*" hidden
-      onchange="fileToVar(this,(d)=>{ceContactImg=d;updPrev('ctImgPrev',d)})">
-    <img id="ctImgPrev" class="pe-prev" style="display:${ceContactImg?'':'none'}" src="${ceContactImg||''}">
-    <label>Хаяг</label><input id="ctAddr" value="${q(siteContent.contact.address)}">
-    <label>Утас</label><input id="ctPhone" value="${q(siteContent.contact.phone)}">
-    <label>Имэйл</label><input id="ctEmail" value="${q(siteContent.contact.email)}">
-    <label>Ажлын цаг</label><input id="ctHours" value="${q(siteContent.contact.hours)}">
+    ${sep}<h3 style="font-size:14px">📍 Хаяг, байршил</h3>
+    <label>Ерөнхий и-мэйл</label><input id="ctEmail" value="${q(siteContent.contact.email)}">
+    <div id="brEditor"></div>
+    <button class="nf-btn" style="background:#235052" onclick="addBranch()">＋ Салбар нэмэх</button>
 
     <button class="nf-btn" onclick="saveContent()">💾 Бүгдийг хадгалах</button>
     <button class="nf-btn" style="background:#235052" onclick="previewPopup()">👁 Popup-г турших</button>`;
+  ceBranches = JSON.parse(JSON.stringify(branchList()));
+  renderBranchEditor();
   openOv('ovBannerEdit');
+}
+// ---- Салбарын засвар ----
+let ceBranches = [];
+function renderBranchEditor(){
+  const box = document.getElementById('brEditor');
+  if(!box) return;
+  const q = (s)=>(s||'').replace(/"/g,'&quot;');
+  box.innerHTML = ceBranches.map((b,i)=>`
+    <div class="br-edit">
+      <div class="brh"><b>Салбар ${i+1}</b>
+        <button onclick="rmBranch(${i})" title="Устгах">🗑</button></div>
+      <label>Салбарын нэр</label>
+      <input value="${q(b.name)}" oninput="ceBranches[${i}].name=this.value">
+      <label>Хаяг</label>
+      <input value="${q(b.address)}" oninput="ceBranches[${i}].address=this.value">
+      <label>Утас</label>
+      <input value="${q(b.phone)}" oninput="ceBranches[${i}].phone=this.value">
+      <label>Ажлын цаг</label>
+      <input value="${q(b.hours)}" oninput="ceBranches[${i}].hours=this.value">
+      <label>Газрын зургийн холбоос (Google Maps)</label>
+      <input value="${q(b.map)}" placeholder="https://maps.app.goo.gl/..."
+        oninput="ceBranches[${i}].map=this.value">
+      <label>Зураг</label>
+      <div style="display:flex;gap:8px">
+        <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+          onclick="document.getElementById('brF${i}').click()">📷 Зураг сонгох</button>
+        <button class="nf-btn" style="margin:0;background:#235052"
+          onclick="ceBranches[${i}].image='';updPrev('brP${i}','')">🗑</button>
+      </div>
+      <input type="file" id="brF${i}" accept="image/*" hidden
+        onchange="fileToVar(this,(d)=>{ceBranches[${i}].image=d;updPrev('brP${i}',d)})">
+      <img id="brP${i}" class="pe-prev" style="display:${b.image?'':'none'}" src="${b.image||''}">
+    </div>`).join('') || '<p class="muted" style="margin-top:10px">Салбар нэмээгүй байна.</p>';
+}
+function addBranch(){
+  ceBranches.push({name:'', address:'', phone:'', hours:'', map:'', image:''});
+  renderBranchEditor();
+}
+function rmBranch(i){
+  ceBranches.splice(i,1);
+  renderBranchEditor();
 }
 function updPrev(id, src){
   const im = document.getElementById(id);
@@ -1383,7 +1443,7 @@ async function saveContent(){
     bnImage  = await sbUpload(bnImage,  'banner');
     bnVideo  = await sbUpload(bnVideo,  'banner');
     cePopImg = await sbUpload(cePopImg, 'popup');
-    ceContactImg = await sbUpload(ceContactImg, 'contact');
+    for(const b of ceBranches) b.image = await sbUpload(b.image, 'branches');
     for(const k of Object.keys(ceCatBn)) ceCatBn[k] = await sbUpload(ceCatBn[k], 'cats');
   }catch(e){ alert('Файл байршуулахад алдаа: '+e.message); return; }
   banner = {
@@ -1401,17 +1461,13 @@ async function saveContent(){
     text: document.getElementById('ppText').value.trim(),
     btn: document.getElementById('ppBtn').value.trim() || 'Хаах',
   };
-  siteContent.contact = {
-    image: ceContactImg,
-    address: document.getElementById('ctAddr').value.trim(),
-    phone: document.getElementById('ctPhone').value.trim(),
-    email: document.getElementById('ctEmail').value.trim(),
-    hours: document.getElementById('ctHours').value.trim(),
-  };
+  siteContent.contact = { email: document.getElementById('ctEmail').value.trim() };
+  siteContent.branches = ceBranches.filter(b=>b.name||b.address||b.phone||b.hours||b.map||b.image);
   try{
     await sbSend('POST', 'site_content',
       {id:1, data:{banner, catBanners:siteContent.catBanners,
-                   popup:siteContent.popup, contact:siteContent.contact}},
+                   popup:siteContent.popup, contact:siteContent.contact,
+                   branches:siteContent.branches}},
       {Prefer:'resolution=merge-duplicates'});
   }catch(e){ alert('Контент хадгалахад алдаа: '+e.message); return; }
   closeOv('ovBannerEdit');
