@@ -40,6 +40,10 @@
   .nf-footer{margin-top:26px; border-top:1px solid #1B4244; padding:18px 16px 10px;
     color:#9a9a9a; font-size:12.5px; line-height:2;}
   .nf-footer b{color:#ddd; font-size:13.5px;}
+  .foot-grid{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
+  .foot-grid > div{flex:1; min-width:200px;}
+  .foot-img{width:100%; max-width:320px; border-radius:12px; object-fit:cover;
+    border:1px solid #1E4749;}
   /* «Шалгах» хэсэг — дэлгүүртэй ижил хар загвар */
   #tab-check{background:#0C2224; min-height:100%;}
   #tab-check .card{background:#123032; border-color:#1E4749;}
@@ -357,6 +361,8 @@
     .mtrack .pcard{margin-right:14px;}
     .cat-banner{height:150px; margin-right:0; border-radius:14px;}
     .nf-footer{padding:30px var(--gut) 18px; font-size:13px;}
+    .foot-grid{gap:36px; align-items:center;}
+    .foot-img{max-width:420px;}
     /* Бусад хэсгүүд — төвд, унших өргөнтэй */
     #tab-worker,#tab-list,#tab-admin,#tab-shopadm,#tab-orders{max-width:760px; margin:0 auto;}
     #tab-check .card{max-width:640px; margin-left:auto; margin-right:auto;}
@@ -776,7 +782,7 @@ let siteContent = {
     title:'Тавтай морил! 🎉',
     text:'Шинэ хэрэглэгчдэд эхний захиалгад 10% хямдрал. Хүргэлт үргэлж үнэгүй!',
     btn:'Дэлгүүр үзэх' },
-  contact: { ...SHOP_INFO },
+  contact: { image:'', ...SHOP_INFO },
 };
 let popupShown = false;
 function maybePopup(){
@@ -805,11 +811,16 @@ function catEmoji(c){
 function footerHtml(){
   const ct = siteContent.contact;
   return `<div class="nf-footer">
-    <b>Холбоо барих</b><br>
-    📍 ${ct.address}<br>
-    ☎ ${ct.phone}<br>
-    ✉ ${ct.email}<br>
-    🕐 ${ct.hours}
+    <div class="foot-grid">
+      <div>
+        <b>Холбоо барих</b><br>
+        📍 ${ct.address}<br>
+        ☎ ${ct.phone}<br>
+        ✉ ${ct.email}<br>
+        🕐 ${ct.hours}
+      </div>
+      ${ct.image?`<img class="foot-img" src="${ct.image}" alt="">`:''}
+    </div>
   </div>`;
 }
 // ---- Баннер: карусель — ‹ › сумаар онцлох бараагаа солино ----
@@ -1261,7 +1272,7 @@ async function saveProd(){
 }
 
 // ---- Контент засах (админ): баннер + ангиллын баннерууд + popup + хаяг ----
-let bnImage = '', bnVideo = '', ceCatBn = {}, cePopImg = '';
+let bnImage = '', bnVideo = '', ceCatBn = {}, cePopImg = '', ceContactImg = '';
 function fileToVar(input, cb){
   const f = input.files && input.files[0]; if(!f) return;
   const rd = new FileReader();
@@ -1273,6 +1284,7 @@ function openContentEdit(){
   bnVideo = banner.video || '';
   ceCatBn = {...siteContent.catBanners};
   cePopImg = siteContent.popup.image || '';
+  ceContactImg = siteContent.contact.image || '';
   const cats = catNames();
   const q = (s)=>(s||'').replace(/"/g,'&quot;');
   const sep = `<div style="border-top:1px solid #333;margin:18px 0 6px"></div>`;
@@ -1337,6 +1349,16 @@ function openContentEdit(){
     <label>Товчны бичиг</label><input id="ppBtn" value="${q(siteContent.popup.btn)}">
 
     ${sep}<h3 style="font-size:14px">📍 Хаяг, холбоо барих</h3>
+    <label>Зураг (байршлын зураг, дэлгүүрийн гэрэл зураг г.м.)</label>
+    <div style="display:flex;gap:8px">
+      <button class="nf-btn" style="margin:0;flex:1;background:#235052"
+        onclick="document.getElementById('ctImgFile').click()">📷 Зураг сонгох</button>
+      <button class="nf-btn" style="margin:0;background:#235052"
+        onclick="ceContactImg='';updPrev('ctImgPrev','')">🗑</button>
+    </div>
+    <input type="file" id="ctImgFile" accept="image/*" hidden
+      onchange="fileToVar(this,(d)=>{ceContactImg=d;updPrev('ctImgPrev',d)})">
+    <img id="ctImgPrev" class="pe-prev" style="display:${ceContactImg?'':'none'}" src="${ceContactImg||''}">
     <label>Хаяг</label><input id="ctAddr" value="${q(siteContent.contact.address)}">
     <label>Утас</label><input id="ctPhone" value="${q(siteContent.contact.phone)}">
     <label>Имэйл</label><input id="ctEmail" value="${q(siteContent.contact.email)}">
@@ -1361,6 +1383,7 @@ async function saveContent(){
     bnImage  = await sbUpload(bnImage,  'banner');
     bnVideo  = await sbUpload(bnVideo,  'banner');
     cePopImg = await sbUpload(cePopImg, 'popup');
+    ceContactImg = await sbUpload(ceContactImg, 'contact');
     for(const k of Object.keys(ceCatBn)) ceCatBn[k] = await sbUpload(ceCatBn[k], 'cats');
   }catch(e){ alert('Файл байршуулахад алдаа: '+e.message); return; }
   banner = {
@@ -1379,6 +1402,7 @@ async function saveContent(){
     btn: document.getElementById('ppBtn').value.trim() || 'Хаах',
   };
   siteContent.contact = {
+    image: ceContactImg,
     address: document.getElementById('ctAddr').value.trim(),
     phone: document.getElementById('ctPhone').value.trim(),
     email: document.getElementById('ctEmail').value.trim(),
