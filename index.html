@@ -286,6 +286,10 @@
     background-size:cover; background-position:center; position:relative;
     display:flex; align-items:center; justify-content:center; overflow:hidden;}
   .pcard-em{font-size:56px;}
+  .oos{position:absolute; inset:0; background:rgba(8,24,26,.62); display:flex;
+    align-items:center; justify-content:center; z-index:3;}
+  .oos span{background:#123032; color:#fff; font-size:11.5px; font-weight:800;
+    letter-spacing:1px; border-radius:99px; padding:8px 16px;}
   .fav{position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:99px;
     background:#fff; border:none; cursor:pointer; font-size:15px; color:#444;
     display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.15);}
@@ -450,7 +454,6 @@
     <section id="tab-shopadm" style="display:none">
       <div class="card">
         <h2>🛍 Дэлгүүрийн бараа</h2>
-        <button class="btn btn-primary" onclick="openProdEdit(0)">＋ Шинэ бараа нэмэх</button>
         <button class="btn btn-secondary" onclick="openCatEdit()">🏷 Ангилал удирдах</button>
         <button class="btn btn-secondary" onclick="openContentEdit()">🎨 Контент засах (баннер · зураг · popup · хаяг)</button>
         <div id="prodAdmList" style="margin-top:12px"></div>
@@ -595,6 +598,30 @@ const SUPABASE_URL = 'https://tmudzrtyzkciwloenbrh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWR6cnR5emtjaXdsb2VuYnJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MDUxODIsImV4cCI6MjEwNDI4MTE4Mn0.46rMrgZ3IrsielqPkC1AjZz7eWLYAJzEiJpzxFts5UQ';
 const SHOP_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
+// ---- CoreLink (агуулах · дуудлага · хүргэлт) холболт ----
+const CORELINK_URL  = 'https://eeurdykmdsihbufsfybf.supabase.co';
+const CORELINK_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVldXJkeWttZHNpaGJ1ZnNmeWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMzg3MzksImV4cCI6MjA5MjkxNDczOX0.r6EqdNCuuG97iNAtYgr1aXW4cPpLmWvyBIo24CYSxTY';
+const CORELINK_PAGE = 'ORGOO';           // biz_fb_pages дахь брэнд/page нэр
+const CORELINK_MODE = 'direct';          // 'direct' | 'callcenter'
+const clH = {apikey:CORELINK_ANON, Authorization:'Bearer '+CORELINK_ANON, 'content-type':'application/json'};
+
+async function clLoadProducts(){
+  const r = await fetch(CORELINK_URL+'/rest/v1/web_products?select=*&order=name', {headers:clH});
+  if(!r.ok) throw new Error('CoreLink бараа татахад алдаа '+r.status);
+  return r.json();
+}
+async function clSubmitOrder(o){
+  const r = await fetch(CORELINK_URL+'/rest/v1/rpc/create_web_order',{
+    method:'POST', headers:clH,
+    body: JSON.stringify({
+      p_phone:o.phone, p_name:o.name||null, p_address:o.address||null,
+      p_items:o.items, p_note:o.note||null,
+      p_page_key:CORELINK_PAGE, p_external_id:o.externalId||null, p_mode:CORELINK_MODE})});
+  const d = await r.json();
+  if(!r.ok) throw new Error(d.message || d.hint || 'Захиалга илгээхэд алдаа гарлаа');
+  return d;
+}
+
 // ---- Supabase туслах давхарга ----
 let sbToken = null;   // админ нэвтэрсний дараа JWT энд хадгалагдана
 function sbH(extra){
@@ -680,8 +707,44 @@ const DEMO_PRODUCTS = [
 ];
 const CARD_BG = ['#0F4F4A','#156A62','#0C3B3D','#1A7A6E','#123F4A','#0E5A50','#17877A','#0F3335'];
 
-let shopProducts = DEMO_PRODUCTS.slice();
+let shopProducts = [];    // нэгтгэсэн бараа (CoreLink + сайтын нэмэлт)
+let clProducts   = [];    // CoreLink-ийн түүхий өгөгдөл
+let webExtras    = [];    // сайтын products хүснэгт — зураг, тайлбар, ангилал
 let shopCats = [];        // [{id, name, sort}] — админаас удирддаг ангиллууд
+
+// SKU-аас тогтвортой дотоод дугаар (сагс, UI-д ашиглана)
+function skuId(sku){
+  let x = 0; const s = String(sku||'');
+  for(let i=0;i<s.length;i++) x = (x*31 + s.charCodeAt(i)) >>> 0;
+  return x % 100000000;
+}
+// ⚠️ Үнэ ЗӨВХӨН CoreLink-ээс ирнэ — сайтаас хямдрал нэмэхгүй,
+//    эс бөгөөс харагдах үнэ ба бодогдох дүн зөрөх болно.
+function mergeProducts(){
+  const byS = {};
+  webExtras.forEach(w=>{ const k=(w.sku||'').trim().toUpperCase(); if(k) byS[k]=w; });
+  return clProducts.map(c=>{
+    const w = byS[(c.sku||'').trim().toUpperCase()] || {};
+    return {
+      id: skuId(c.sku || c.id),
+      sku: c.sku || '',
+      clId: c.id,
+      extraId: w.id || null,
+      name: c.name || '',
+      category: w.category || c.category || '',
+      price: Number(c.price) || 0,
+      discount: 0,
+      rating: Number(w.rating) || 0,
+      stock: Number(c.stock) || 0,
+      in_stock: c.in_stock !== false,
+      best_seller: !!w.best_seller,
+      image: w.image || c.image_url || '',
+      description: w.description || c.description || '',
+      usage: w.usage || '',
+      caution: w.caution || '',
+    };
+  });
+}
 let cart = [];            // [{id, qty}]
 let dQty = 1;             // дэлгэрэнгүй дэх тоо ширхэг
 let curPid = null;
@@ -709,8 +772,11 @@ const cardBg = (p)=> CARD_BG[p.id % CARD_BG.length];
 // --- Supabase-аас бараа татах (түлхүүр орсон үед) ---
 async function loadShop(){
   if(!SHOP_DEMO){
-    try{ shopProducts = await sbGet('products?select=*&order=id'); }
-    catch(e){ console.warn('Бараа татахад алдаа:', e.message); }
+    try{ webExtras = await sbGet('products?select=*&order=id'); }
+    catch(e){ console.warn('Нэмэлт мэдээлэл татахад алдаа:', e.message); }
+    try{ clProducts = await clLoadProducts(); }
+    catch(e){ console.warn('CoreLink:', e.message); }
+    shopProducts = mergeProducts();
     try{ shopCats = await sbGet('categories?select=*&order=sort,name'); }
     catch(e){ console.warn('Ангилал татахад алдаа:', e.message); }
     try{
@@ -736,6 +802,8 @@ function toggleFav(id){
 }
 // Карт дээрх хурдан товчнууд
 function quickCart(id){
+  const p = prod(id);
+  if(p && p.in_stock===false){ flash('Энэ бараа дууссан байна'); return; }
   const ex = cart.find(c=>c.id===id);
   if(ex) ex.qty += 1; else cart.push({id, qty:1});
   updateCartBadge();
@@ -753,10 +821,11 @@ function cardHtml(p, rank){
       ${rank?`<span class="rank">#${rank}</span>`:''}
       ${p.discount?`<span class="rank" style="left:auto;right:44px;background:#0e9f6e">−${p.discount}%</span>`:''}
       <button class="fav ${favs.has(p.id)?'on':''}" onclick="event.stopPropagation();toggleFav(${p.id})">${favs.has(p.id)?'♥':'♡'}</button>
+      ${p.in_stock===false?'<div class="oos"><span>ДУУССАН</span></div>':`
       <div class="pcard-btns">
         <button class="pcb pink" onclick="event.stopPropagation();quickCart(${p.id})">Сагсанд</button>
         <button class="pcb dark" onclick="event.stopPropagation();quickBuy(${p.id})">Авах</button>
-      </div>
+      </div>`}
     </div>
     <div class="pcard-name">${p.name}</div>
     <div class="pcard-row">
@@ -957,10 +1026,12 @@ function openDetail(id){
     <div class="qty">
       <button onclick="chQty(-1)">−</button><b id="dQtyView">1</b><button onclick="chQty(1)">+</button>
     </div>
-    <div class="dbtns">
+    ${p.in_stock===false
+      ? `<div class="nf-btn gray" style="width:100%;text-align:center;opacity:.7;cursor:default">Дууссан</div>`
+      : `<div class="dbtns">
       <button class="nf-btn gray" onclick="addToCart()">🛒 Сагслах</button>
       <button class="nf-btn" onclick="buyNow()">⚡ Шууд авах — <span id="dSum">${fmt(u)}</span></button>
-    </div>`;
+    </div>`}`;
   openOv('ovDetail');
 }
 function chQty(d){
@@ -1044,7 +1115,7 @@ function buyNow(){
 function openCheckout(direct){
   if(!direct) buyNowItem = null;
   closeOv('ovCart');
-  payMethod = 'QPay';
+  payMethod = 'Бэлнээр (хүргэх үед)';
   const src = buyNowItem ? [buyNowItem] : cart;
   const total = src.reduce((s,c)=>s+unit(prod(c.id))*c.qty,0);
   document.getElementById('shCheckout').innerHTML = `
@@ -1057,8 +1128,8 @@ function openCheckout(direct){
     <label>Хот *</label><input id="coCity" value="Улаанбаатар">
     <label>Төлбөрийн хэлбэр</label>
     <div class="paychoice">
-      <div class="pc sel" id="pcQ" onclick="setPay('QPay')">📱 QPay</div>
-      <div class="pc" id="pcC" onclick="setPay('cash')">💵 Бэлнээр (хүргэх үед)</div>
+      <div class="pc sel" id="pcC" onclick="setPay('cash')">💵 Бэлнээр (хүргэх үед)</div>
+      <div class="pc" id="pcQ" onclick="setPay('QPay')">📱 QPay</div>
     </div>
     <div class="total-row"><span>Нийт</span><span>${fmt(total)}</span></div>
     <div class="free-ship">🚚 Хүргэлт үнэгүй · Төлбөр төлөгдсөний маргааш 12:00–18:00-д хүргэнэ</div>
@@ -1081,25 +1152,38 @@ async function submitOrder(){
   if(!name || !addr || !city){ err.textContent='Бүх талбарыг бөглөнө үү.'; err.style.display='block'; return; }
   if(phone.length!==8){ err.textContent='Утасны дугаар яг 8 цифр байх ёстой.'; err.style.display='block'; return; }
   const src = buyNowItem ? [buyNowItem] : cart;
-  const items = src.map(c=>{const p=prod(c.id); return {product_id:p.id, name:p.name, qty:c.qty, price:unit(p)};});
+  const items = src.map(c=>{const p=prod(c.id); return {product_id:p.id, sku:p.sku, name:p.name, qty:c.qty, price:unit(p)};});
   const total = items.reduce((s,i)=>s+i.price*i.qty,0);
   const order = {
-    id:'CD'+String(Math.floor(10000+Math.random()*90000)),
+    id:'CD'+String(Math.floor(10000+Math.random()*90000))+'-'+Date.now().toString(36).slice(-4),
     date:new Date().toISOString().slice(0,10),
     items, total, customer:name, phone, address:addr, city,
     pay:payMethod, status:'Хүлээгдэж буй',
     payment_status: payMethod==='QPay'?'pending':'', qpay_invoice_id:''
   };
-  if(!SHOP_DEMO){
-    try{
-      await fetch(SUPABASE_URL+'/rest/v1/rpc/place_order',{
-        method:'POST',
-        headers:{apikey:SUPABASE_ANON_KEY, Authorization:'Bearer '+SUPABASE_ANON_KEY, 'content-type':'application/json'},
-        body:JSON.stringify({p_order:order})});
-    }catch(e){ err.textContent='Захиалга илгээхэд алдаа: '+e.message; err.style.display='block'; return; }
-  }else{
-    demoOrders.push(order);
+  // 1) CoreLink рүү илгээнэ — дүнг СЕРВЕР ДЭЭР нь дахин бодно
+  const btnErr = err;
+  btnErr.textContent = 'Илгээж байна...'; btnErr.style.display='block';
+  let cl;
+  try{
+    cl = await clSubmitOrder({
+      phone, name, address: city ? (city + ', ' + addr) : addr,
+      items: src.map(c=>{const p=prod(c.id);
+        return p.sku ? {sku:p.sku, quantity:c.qty} : {product_id:p.clId, quantity:c.qty};}),
+      note: 'Төлбөр: ' + payMethod,
+      externalId: order.id,
+    });
+  }catch(e){
+    btnErr.textContent = 'Захиалга илгээхэд алдаа: ' + String(e.message).slice(0,180);
+    btnErr.style.display='block';
+    return;
   }
+  btnErr.style.display='none';
+  if(cl && typeof cl.total === 'number') order.total = cl.total;
+  order.corelink_ref = cl && (cl.order_number || cl.call_id) || '';
+
+  // 2) Сайтын дотоод бүртгэлд хуулбар үлдээнэ (админы «Захиалга» цэст харагдана)
+  try{ await sbRpc('log_order', {p:order}); }catch(e){ console.warn('log_order:', e.message); }
   if(!buyNowItem){ cart = []; updateCartBadge(); }
   buyNowItem = null;
   closeOv('ovCheckout');
@@ -1144,7 +1228,9 @@ async function openQpay(order){
         }catch(e){}
       }, 3500);
     }catch(e){
-      document.getElementById('qrBox').textContent = 'Нэхэмжлэл үүсгэхэд алдаа гарлаа';
+      document.getElementById('qrBox').innerHTML =
+        'QPay одоогоор тохируулагдаагүй байна.<br><br>Захиалга бүртгэгдсэн —<br>төлбөрийг хүргэлтийн үед төлнө үү.';
+      const st = document.getElementById('qpayStatus'); if(st) st.textContent='';
     }
   }
 }
@@ -1202,29 +1288,28 @@ function renderShopAdm(){
       ${p.image?`<img class="thumb" src="${p.image}" alt="">`:(p.e?`<span class="em3">${p.e}</span>`:'<div class="noimg sm light"></div>')}
       <div class="pi">
         <div class="pn">${p.name}</div>
-        <div class="pm">${p.sku?'<b>'+esc(p.sku)+'</b> · ':''}${p.category||'—'} · ${fmt(p.price)}${p.discount?' · −'+p.discount+'%':''} · Үлд: ${p.stock??'-'}</div>
+        <div class="pm">${p.sku?'<b>'+esc(p.sku)+'</b> · ':''}${p.category||'ангилалгүй'} · ${fmt(p.price)} · Үлд: ${p.stock??'-'}${p.in_stock===false?' · <span style="color:#c0392b">дууссан</span>':''}</div>
       </div>
       <button class="star ${p.best_seller?'on':'off'}" title="Bestseller" onclick="toggleBest(${p.id})">⭐</button>
       <button onclick="openProdEdit(${p.id})">✏️</button>
-      <button onclick="delProd(${p.id})">🗑</button>
     </div>`).join('') || '<p class="empty">Бараа алга.</p>';
 }
 async function toggleBest(id){
   const p = prod(id); if(!p) return;
   const v = !p.best_seller;
   try{
-    await sbSend('PATCH', 'products?id=eq.'+id, {best_seller:v});
-    p.best_seller = v; renderShopAdm(); renderShop();
-  }catch(e){ alert('Хадгалахад алдаа: '+e.message); }
-}
-async function delProd(id){
-  if(!confirm('Энэ барааг устгах уу?')) return;
-  try{
-    await sbSend('DELETE', 'products?id=eq.'+id);
-    shopProducts = shopProducts.filter(p=>p.id!==id);
-    cart = cart.filter(c=>c.id!==id); updateCartBadge();
+    if(p.extraId){
+      await sbSend('PATCH','products?id=eq.'+p.extraId, {best_seller:v});
+      const w = webExtras.find(x=>x.id===p.extraId); if(w) w.best_seller = v;
+    }else{
+      const rows = await sbSend('POST','products',
+        {sku:p.sku, name:p.name, price:p.price, category:p.category, best_seller:v},
+        {Prefer:'return=representation'});
+      if(rows && rows[0]){ webExtras.push(rows[0]); p.extraId = rows[0].id; }
+    }
+    p.best_seller = v;
     renderShopAdm(); renderShop();
-  }catch(e){ alert('Устгахад алдаа: '+e.message); }
+  }catch(e){ alert('Хадгалахад алдаа: '+e.message.slice(0,160)); }
 }
 function openProdEdit(id){
   editPid = id;
@@ -1242,20 +1327,17 @@ function openProdEdit(id){
     </div>
     <input type="file" id="peImgFile" accept="image/*" hidden onchange="onPeImg(this)">
     <img id="peImgPrev" class="pe-prev" style="display:${p.image?'':'none'}" src="${p.image||''}">
-    <label>Нэр *</label><input id="peName" value="${(p.name||'').replace(/"/g,'&quot;')}">
-    <label>SKU / Дотоодын код</label><input id="peSku" value="${(p.sku||'').replace(/"/g,'&quot;')}" placeholder="ж: CD-0001">
+    <div class="muted" style="background:#0F2A2C;border-radius:10px;padding:10px;margin-top:8px;line-height:1.8">
+      <b style="color:#8FE3D2">${p.name}</b><br>
+      SKU: ${p.sku||'—'} · Үнэ: ${fmt(p.price)} · Үлдэгдэл: ${p.stock}<br>
+      <span style="color:#8a8a8a">Нэр, үнэ, үлдэгдлийг CoreLink дээрээс өөрчилнө.</span>
+    </div>
     <label>Ангилал</label>
     <select id="peCat" style="width:100%;background:#1B4244;border:1px solid #2A5658;
       border-radius:8px;padding:10px;color:#fff;font-size:14px;margin-top:4px">
       <option value="">— сонгоно уу —</option>
       ${catNames().map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===p.category?'selected':''}>${c}</option>`).join('')}
     </select>
-    <label>Үнэ (₮) *</label><input id="pePrice" inputmode="numeric" value="${p.price||0}"
-      oninput="this.value=this.value.replace(/\\D/g,'')">
-    <label>Хямдрал (%)</label><input id="peDisc" inputmode="numeric" value="${p.discount||0}"
-      oninput="this.value=this.value.replace(/\\D/g,'').slice(0,3)">
-    <label>Үлдэгдэл</label><input id="peStock" inputmode="numeric" value="${p.stock||0}"
-      oninput="this.value=this.value.replace(/\\D/g,'')">
     <label>Тайлбар</label><input id="peDesc" value="${(p.description||'').replace(/"/g,'&quot;')}">
     <label>Хэрэглэх заавар</label><input id="peUsage" value="${(p.usage||'').replace(/"/g,'&quot;')}">
     <label>Анхаарах зүйлс</label><input id="peCaution" value="${(p.caution||'').replace(/"/g,'&quot;')}">
@@ -1264,32 +1346,31 @@ function openProdEdit(id){
   openOv('ovProdEdit');
 }
 async function saveProd(){
-  const name = document.getElementById('peName').value.trim();
-  const price = parseInt(document.getElementById('pePrice').value||'0',10);
   const err = document.getElementById('peErr');
-  if(!name || !price){ err.textContent='Нэр болон үнийг оруулна уу.'; err.style.display='block'; return; }
-  const disc = Math.min(100, parseInt(document.getElementById('peDisc').value||'0',10));
+  const p = prod(editPid);
+  if(!p){ err.textContent='Бараа олдсонгүй.'; err.style.display='block'; return; }
   const vals = {
-    image:peImage, name,
-    sku:document.getElementById('peSku').value.trim(),
-    category:document.getElementById('peCat').value,
-    price, discount:disc,
-    stock:parseInt(document.getElementById('peStock').value||'0',10),
-    description:document.getElementById('peDesc').value.trim(),
-    usage:document.getElementById('peUsage').value.trim(),
-    caution:document.getElementById('peCaution').value.trim(),
+    sku: p.sku,
+    name: p.name,
+    price: p.price,
+    image: peImage,
+    category: document.getElementById('peCat').value,
+    description: document.getElementById('peDesc').value.trim(),
+    usage: document.getElementById('peUsage').value.trim(),
+    caution: document.getElementById('peCaution').value.trim(),
   };
   try{
     err.textContent='Хадгалж байна...'; err.style.display='block';
     vals.image = await sbUpload(vals.image, 'products');
-    if(editPid){
-      const rows = await sbSend('PATCH', 'products?id=eq.'+editPid, vals, {Prefer:'return=representation'});
-      Object.assign(prod(editPid), rows && rows[0] ? rows[0] : vals);
+    if(p.extraId){
+      await sbSend('PATCH','products?id=eq.'+p.extraId, vals);
+      const w = webExtras.find(x=>x.id===p.extraId); if(w) Object.assign(w, vals);
     }else{
-      const rows = await sbSend('POST', 'products',
-        Object.assign({best_seller:false, rating:0}, vals), {Prefer:'return=representation'});
-      if(rows && rows[0]) shopProducts.push(rows[0]);
+      const rows = await sbSend('POST','products',
+        Object.assign({best_seller:p.best_seller||false, rating:0}, vals), {Prefer:'return=representation'});
+      if(rows && rows[0]){ webExtras.push(rows[0]); p.extraId = rows[0].id; }
     }
+    shopProducts = mergeProducts();
     err.style.display='none';
     closeOv('ovProdEdit');
     renderShopAdm(); renderShop();
@@ -1864,7 +1945,8 @@ async function delCat(name){
     if(row) await sbSend('DELETE','categories?id=eq.'+row.id);
     if(n) await sbSend('PATCH','products?category=eq.'+encodeURIComponent(name), {category:null});
     shopCats = shopCats.filter(c=>c.name!==name);
-    shopProducts.forEach(p=>{ if(p.category===name) p.category=null; });
+    webExtras.forEach(w=>{ if(w.category===name) w.category=null; });
+    shopProducts = mergeProducts();
     if(catFilter===name) catFilter='';
     renderCatEdit(); renderShopAdm(); renderShop();
     flash('✓ Ангилал устлаа');
