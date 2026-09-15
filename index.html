@@ -142,30 +142,6 @@
   .hero2-grid{position:relative; display:flex; gap:16px; padding:24px 16px;
     align-items:center; justify-content:space-between; z-index:1;}
   .hero2-left{flex:1; min-width:0;}
-  .hero2-price{color:#fff; font-size:26px; font-weight:800; margin:10px 0 14px;}
-  .hero2-price .old{color:#c9c9c9; text-decoration:line-through; font-size:15px;
-    font-weight:600; margin-right:8px;}
-  .hero2-btns{display:flex; gap:8px; flex-wrap:wrap;}
-  .hbtn{border:none; border-radius:99px; padding:11px 18px; font-weight:800;
-    font-size:12.5px; cursor:pointer; letter-spacing:.6px;}
-  .hbtn.red{background:#1FBFAB; color:#fff;}
-  .hbtn.red:active{background:#159884;}
-  .hbtn.white{background:#fff; color:#1a1a1a;}
-  .hbtn.ghost{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.55);}
-  .hero2-card{position:relative; width:160px; height:195px; border-radius:16px;
-    background:repeating-linear-gradient(45deg,#E7F4F0 0 12px,#DAECE7 12px 24px);
-    box-shadow:0 14px 34px rgba(0,0,0,.35); flex-shrink:0; cursor:pointer;
-    overflow:hidden; display:flex; align-items:center; justify-content:center;}
-  .hero2-card img{width:100%; height:100%; object-fit:contain; background:#fff;}
-  .hc-name{color:#6F8F8A; font-size:10.5px; letter-spacing:2px; text-transform:uppercase;
-    text-align:center; padding:0 12px; line-height:1.8;}
-  .sale{position:absolute; top:10px; left:10px; background:#1FBFAB; color:#fff;
-    font-size:11px; font-weight:800; border-radius:99px; padding:5px 12px;
-    box-shadow:0 4px 10px rgba(31,191,171,.45); z-index:2;}
-  .hc-arrows{position:absolute; bottom:10px; right:10px; display:flex; gap:8px; z-index:2;}
-  .hc-arrows button{width:34px; height:34px; border-radius:99px; border:none;
-    background:#235052; color:#fff; font-size:16px; cursor:pointer; line-height:1;}
-  .hc-arrows button:hover{background:#2C5F61;}
   .nf-hero-body{position:relative; padding:16px; width:100%;
     background:linear-gradient(transparent,rgba(20,20,20,.95));}
   .nf-hero-tag{color:#1FBFAB; font-size:11px; font-weight:800; letter-spacing:2px;}
@@ -358,13 +334,7 @@
     .nf-hero-sub{font-size:15px; margin-bottom:14px;}
     .nf-btn{padding:11px 26px; font-size:15px;}
     .hero2-grid{padding:46px var(--gut); gap:40px;}
-    .hero2-price{font-size:34px; margin:14px 0 18px;}
-    .hero2-price .old{font-size:18px;}
-    .hbtn{padding:13px 26px; font-size:14px;}
-    .hero2-card{width:300px; height:345px; border-radius:20px;}
-    .hc-name{font-size:12.5px;}
-    .hc-arrows button{width:40px; height:40px; font-size:18px;}
-    .cat-chips{padding:20px var(--gut) 0;}
+                .cat-chips{padding:20px var(--gut) 0;}
     .cat-chip{font-size:12.5px; padding:8px 16px; transition:background .15s;}
     .cat-chip:hover{background:#2A5658;}
     .cat-chip.sel:hover{background:#1FBFAB;}
@@ -921,52 +891,24 @@ function footerHtml(){
     </div>
   </div>`;
 }
-// ---- Баннер: карусель — ‹ › сумаар онцлох бараагаа солино ----
-let heroIdx = 0;
-function heroList(){
-  const best = shopProducts.filter(p=>p.best_seller);
-  return best.length ? best : shopProducts;
-}
-function heroNav(d){
-  const list = heroList();
-  if(!list.length) return;
-  heroIdx = (heroIdx + d + list.length) % list.length;
-  renderHero();
-}
 function renderHero(){
-  const list = heroList();
-  const hp = list.length ? list[heroIdx % list.length] : null;
-  if(!hp){ document.getElementById('shopHero').innerHTML=''; return; }
-  const bImg = banner.image || '';
-  const bVid = banner.video || '';
-  const bTag = banner.tag || ((hp.category||'').toUpperCase() + ' · ОНЦЛОХ');
-  const bTitle = banner.title || hp.name;
-  const bSub = banner.subtitle || '';
-  const u = unit(hp);
-  document.getElementById('shopHero').innerHTML = `
+  // Баннер нь зөвхөн админаас тохируулсан зураг/бичлэг, бичвэрийг харуулна —
+  // барааны мэдээлэл, үнэ, товч энд гарахгүй.
+  const bImg   = banner.image || '';
+  const bVid   = banner.video || '';
+  const bTag   = banner.tag || '';
+  const bTitle = banner.title || '';
+  const bSub   = banner.subtitle || '';
+  const box = document.getElementById('shopHero');
+  if(!bImg && !bVid && !bTag && !bTitle && !bSub){ box.innerHTML = ''; return; }
+  box.innerHTML = `
     <div class="nf-hero hero2"${(!bVid && bImg)?` style="background:url('${bImg}') center/cover no-repeat"`:''}>
       ${bVid?`<video class="nf-hero-vid" src="${bVid}" autoplay muted loop playsinline></video>`:''}
       <div class="hero2-grid">
         <div class="hero2-left">
-          <div class="nf-hero-tag">${bTag}</div>
-          <div class="nf-hero-title">${bTitle}</div>
+          ${bTag?`<div class="nf-hero-tag">${bTag}</div>`:''}
+          ${bTitle?`<div class="nf-hero-title">${bTitle}</div>`:''}
           ${bSub?`<div class="nf-hero-sub">${bSub}</div>`:''}
-          <div class="hero2-price">
-            ${hp.discount?`<span class="old">${fmt(hp.price)}</span>`:''}${fmt(u)}
-          </div>
-          <div class="hero2-btns">
-            <button class="hbtn red" onclick="quickCart(${hp.id})">САГСЛАХ</button>
-            <button class="hbtn white" onclick="quickBuy(${hp.id})">ШУУД АВАХ</button>
-            <button class="hbtn ghost" onclick="openDetail(${hp.id})">ДЭЛГЭРЭНГҮЙ</button>
-          </div>
-        </div>
-        <div class="hero2-card" onclick="openDetail(${hp.id})">
-          ${hp.discount?`<span class="sale">SALE</span>`:''}
-          ${hp.image?`<img src="${hp.image}" alt="">`:`<span class="hc-name">${hp.name}</span>`}
-          <div class="hc-arrows">
-            <button onclick="event.stopPropagation();heroNav(-1)">‹</button>
-            <button onclick="event.stopPropagation();heroNav(1)">›</button>
-          </div>
         </div>
       </div>
     </div>`;
