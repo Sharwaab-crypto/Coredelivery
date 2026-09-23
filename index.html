@@ -256,6 +256,10 @@
   .thumb{width:36px; height:36px; border-radius:8px; object-fit:cover; flex-shrink:0;}
   .pe-prev{width:100%; max-height:150px; object-fit:contain; border-radius:10px;
     background:#fff; margin-top:8px;}
+  .imghint{color:#7FBFB4; font-size:11.5px; line-height:1.6; margin:2px 0 6px;
+    background:#0F2A2C; border-left:3px solid #1FBFAB; border-radius:0 8px 8px 0;
+    padding:7px 10px;}
+  .imghint b{color:#B8EDE3;}
   /* ---- TMS маягийн барааны карт ---- */
   .pcard{width:150px; flex-shrink:0; cursor:pointer;}
   .pcard-img{width:150px; height:200px; border-radius:14px; background-color:#DCEFEA;
@@ -621,11 +625,13 @@ async function sbRpc(fn, args){
   return t ? JSON.parse(t) : null;
 }
 // Зургийг багасгаад Storage-д байршуулж public URL буцаана
+// Хэсэг тус бүрийн зургийн дээд хэмжээ (урт талаар, пиксэл)
+const IMG_MAX = {banner:1600, cats:1400, popup:1000, branches:1200, contact:1200, products:1000, deliveries:1400};
 async function sbUpload(dataUrl, folder){
   if(!dataUrl) return '';
   if(/^https?:/.test(dataUrl)) return dataUrl;   // аль хэдийн байршсан
   let blob = await (await fetch(dataUrl)).blob();
-  if(blob.type.startsWith('image/')) blob = await shrinkImage(dataUrl);
+  if(blob.type.startsWith('image/')) blob = await shrinkImage(dataUrl, IMG_MAX[folder] || 1000);
   const ext = (blob.type.split('/')[1]||'bin').split(';')[0];
   const name = folder + '/' + Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
   const r = await fetch(SUPABASE_URL + '/storage/v1/object/images/' + name, {
@@ -1262,6 +1268,8 @@ function openProdEdit(id){
     <span class="close" onclick="closeOv('ovProdEdit')">✕</span>
     <h3>${id?'✏️ Бараа засах':'＋ Шинэ бараа'}</h3>
     <label>Зураг</label>
+    <div class="imghint">Санал болгох: <b>800 × 1000px</b> (босоо, 4:5)<br>
+      Картад бүтнээрээ багтана. Цагаан эсвэл цайвар дэвсгэртэй зураг хамгийн цэвэрхэн харагдана.</div>
     <div style="display:flex;gap:8px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('peImgFile').click()">📷 Зураг сонгох</button>
@@ -1344,6 +1352,9 @@ function openContentEdit(){
     <h3>🎨 Контент засах</h3>
 
     <h3 style="font-size:14px;margin-top:8px">🖼 Үндсэн баннер</h3>
+    <div class="imghint">Санал болгох: <b>1600 × 540px</b> (өргөн, 3:1)<br>
+      Дэлгэц дүүрэн сунгаж харуулдаг тул гол зүйлээ <b>голд нь</b> байрлуулна.
+      Зүүн тал дээр гарчиг бичигдэх тул тэнд чөлөөтэй зай үлдээвэл сайн.</div>
     <div style="display:flex;gap:8px;margin-top:6px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('bnImgFile').click()">📷 Зураг сонгох</button>
@@ -1354,6 +1365,8 @@ function openContentEdit(){
       onchange="fileToVar(this,(d)=>{bnImage=d;updPrev('bnImgPrev',d)})">
     <img id="bnImgPrev" class="pe-prev" style="display:${bnImage?'':'none'}" src="${bnImage||''}">
     <label>Баннерын бичлэг</label>
+    <div class="imghint">Санал болгох: <b>1920 × 640px</b>, <b>5–15 секунд</b>, <b>10MB-аас бага</b><br>
+      Дуугүй, давталттай тоглоно. Бичлэг оруулбал зургийг дарж харагдана.</div>
     <div style="display:flex;gap:8px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('bnVidFile').click()">🎬 Бичлэг сонгох</button>
@@ -1370,6 +1383,8 @@ function openContentEdit(){
     <label>Дэд бичвэр</label><input id="bnSub" value="${q(banner.subtitle)}">
 
     ${sep}<h3 style="font-size:14px">🏷 Ангилал бүрийн баннер</h3>
+    <div class="imghint">Санал болгох: <b>1400 × 350px</b> (маш өргөн, 4:1)<br>
+      Ангиллын эгнээний дээр нимгэн туузаар харагдана.</div>
     ${cats.map((c,i)=>`
       <label>${c}</label>
       <div style="display:flex;gap:8px">
@@ -1383,6 +1398,8 @@ function openContentEdit(){
       <img id="cbP${i}" class="pe-prev" style="display:${ceCatBn[c]?'':'none'}" src="${ceCatBn[c]||''}">`).join('')}
 
     ${sep}<h3 style="font-size:14px">💬 Popup баннер</h3>
+    <div class="imghint">Санал болгох: <b>800 × 340px</b> (хэвтээ, ~2.4:1)<br>
+      Цонхны дээд хэсэгт харагдана. Доор нь гарчиг, текст бичигдэнэ.</div>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" id="ppOn" style="width:auto" ${siteContent.popup.enabled?'checked':''}> Идэвхтэй
     </label>
@@ -1432,6 +1449,7 @@ function renderBranchEditor(){
       <input value="${q(b.map)}" placeholder="https://maps.app.goo.gl/..."
         oninput="ceBranches[${i}].map=this.value">
       <label>Зураг</label>
+      <div class="imghint">Санал болгох: <b>800 × 450px</b> (хэвтээ, 16:9)</div>
       <div style="display:flex;gap:8px">
         <button class="nf-btn" style="margin:0;flex:1;background:#235052"
           onclick="document.getElementById('brF${i}').click()">📷 Зураг сонгох</button>
