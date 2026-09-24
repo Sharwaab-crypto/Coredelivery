@@ -625,12 +625,14 @@ async function sbRpc(fn, args){
 }
 // Зургийг багасгаад Storage-д байршуулж public URL буцаана
 // Хэсэг тус бүрийн зургийн дээд хэмжээ (урт талаар, пиксэл)
-const IMG_MAX = {banner:1600, cats:1400, popup:1000, branches:1200, contact:1200, products:1000, deliveries:1400};
+const IMG_MAX = {banner:2400, cats:1800, popup:1400, branches:1400, contact:1400, products:1200, deliveries:1600};
+const IMG_Q   = {banner:0.94, cats:0.92, popup:0.92, branches:0.9,  contact:0.9,  products:0.9,  deliveries:0.82};
 async function sbUpload(dataUrl, folder){
   if(!dataUrl) return '';
   if(/^https?:/.test(dataUrl)) return dataUrl;   // аль хэдийн байршсан
   let blob = await (await fetch(dataUrl)).blob();
-  if(blob.type.startsWith('image/')) blob = await shrinkImage(dataUrl, IMG_MAX[folder] || 1000);
+  if(blob.type.startsWith('image/'))
+    blob = await prepImage(dataUrl, blob, IMG_MAX[folder] || 1200, IMG_Q[folder] || 0.9);
   const ext = (blob.type.split('/')[1]||'bin').split(';')[0];
   const name = folder + '/' + Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.' + ext;
   const r = await fetch(SUPABASE_URL + '/storage/v1/object/images/' + name, {
@@ -641,18 +643,24 @@ async function sbUpload(dataUrl, folder){
   if(!r.ok) throw new Error('Зураг байршуулахад алдаа: ' + (await r.text()).slice(0,150));
   return SUPABASE_URL + '/storage/v1/object/public/images/' + name;
 }
-function shrinkImage(dataUrl, max){
-  max = max || 1000;
-  return new Promise((res, rej)=>{
+// Зураг хэт том үед л багасгана. Багтаж байвал ЭХ ФАЙЛЫГ нь хэвээр
+// байршуулна — дахин шахаж чанарыг нь бууруулахгүй.
+function prepImage(dataUrl, blob, max, quality){
+  return new Promise((res)=>{
     const img = new Image();
     img.onload = ()=>{
-      const sc = Math.min(1, max/Math.max(img.width, img.height));
+      const big = Math.max(img.width, img.height);
+      if(big <= max && blob.size <= 2500000){ res(blob); return; }
+      const sc = Math.min(1, max/big);
       const cv = document.createElement('canvas');
       cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      cv.toBlob(b=>b?res(b):rej(new Error('canvas')), 'image/jpeg', 0.82);
+      const cx = cv.getContext('2d');
+      cx.imageSmoothingEnabled = true;
+      cx.imageSmoothingQuality = 'high';
+      cx.drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(b=>res(b||blob), 'image/jpeg', quality);
     };
-    img.onerror = ()=>rej(new Error('Зураг уншиж чадсангүй'));
+    img.onerror = ()=>res(blob);
     img.src = dataUrl;
   });
 }
@@ -1352,7 +1360,7 @@ function openContentEdit(){
     <h3>🎨 Контент засах</h3>
 
     <h3 style="font-size:14px;margin-top:8px">🖼 Үндсэн баннер</h3>
-    <div class="imghint">Санал болгох: <b>1600 × 540px</b></div>
+    <div class="imghint">Санал болгох: <b>1920 × 650px</b></div>
     <div style="display:flex;gap:8px;margin-top:6px">
       <button class="nf-btn" style="margin:0;flex:1;background:#235052"
         onclick="document.getElementById('bnImgFile').click()">📷 Зураг сонгох</button>
@@ -1380,7 +1388,7 @@ function openContentEdit(){
     <label>Дэд бичвэр</label><input id="bnSub" value="${q(banner.subtitle)}">
 
     ${sep}<h3 style="font-size:14px">🏷 Ангилал бүрийн баннер</h3>
-    <div class="imghint">Санал болгох: <b>1400 × 350px</b></div>
+    <div class="imghint">Санал болгох: <b>1800 × 450px</b></div>
     ${cats.map((c,i)=>`
       <label>${c}</label>
       <div style="display:flex;gap:8px">
